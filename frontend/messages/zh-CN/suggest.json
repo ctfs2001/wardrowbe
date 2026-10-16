@@ -102,5 +102,10 @@
     "reset": "重置",
     "temperature": "温度"
   },
-  "yourOutfit": "你的穿搭"
+  "yourOutfit": "你的穿搭",
+  "eventNotes": {
+    "title": "活动／场合备注（选填）",
+    "subtitle": "今天要出席的活动、地点或 dress code，AI 会优先参考",
+    "placeholder": "例如：客户汇报，需要穿西装外套；朋友婚礼，半正式，避免全白"
+  }
 }
