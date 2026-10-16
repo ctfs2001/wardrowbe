@@ -61,7 +61,9 @@ SEASON_ADJACENCY = {
     "winter": ["fall", "spring"],
 }
 
-TOP_N = 70
+# Show the stylist AI up to this many wardrobe items, so hats, glasses and shoes are never
+# cut off the list (upstream default: 70).
+TOP_N = 200
 MIN_ITEMS_FOR_SCORING = 50
 
 SENSITIVITY_SHIFT = 5

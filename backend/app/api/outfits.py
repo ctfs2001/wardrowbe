@@ -81,6 +81,11 @@ class SuggestRequest(BaseModel):
     weather_override: WeatherOverrideRequest | None = None
     exclude_items: list[UUID] = Field(default_factory=list, description="Items to exclude")
     include_items: list[UUID] = Field(default_factory=list, description="Items to include")
+    event_notes: str | None = Field(
+        default=None,
+        max_length=1000,
+        description="Optional event, venue or dress code; the stylist AI gives it priority",
+    )
 
 
 class OutfitItemResponse(BaseModel):
@@ -505,6 +510,7 @@ async def suggest_outfit_options(
             include_items=request.include_items,
             time_of_day=request.time_of_day,
             count=3,
+            event_notes=request.event_notes,
         )
     except InsufficientWardrobeError as e:
         raise HTTPException(

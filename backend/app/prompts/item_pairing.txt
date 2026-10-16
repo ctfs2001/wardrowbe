@@ -14,7 +14,9 @@ Create {num_pairings} DIFFERENT complete outfits. Each MUST:
   - Suit: exactly ONE top + ONE suit (<<SUIT_TYPES>>) + ONE footwear
 - The silhouette must contain the source item: a top or bottom source is worn as separates, a full-body source as a one-piece and a suit source as a suit. Any other source item, except legwear (below), can go with whichever silhouette suits it
 - NEVER combine two items from the same slot. Bottoms (<<BOTTOM_TYPES>>) are the SAME slot, tops (<<BASE_TOP_TYPES>>) are the SAME slot, a full-body garment already fills both the top and bottom slots, and a suit already fills the bottom slot.
-- Optionally add accessories (belt, bag, jewelry, scarf) if they complement
+- SHOES ARE MANDATORY: include exactly ONE footwear item in every outfit (the same shoes may repeat across outfits). An outfit without footwear is INVALID
+- Include ONE pair of glasses ("glasses (accessories)") in every outfit when the wardrobe has them; add a hat/cap only for casual looks, never with dress shoes, tailored trousers or a blazer. Keep every piece at the same formality level (casual, smart casual or business) and only use a belt with trousers that have belt loops
+- Optionally add other accessories (belt, bag, jewelry, scarf) if they complement
 - Optionally add legwear (<<LEGWEAR_TYPES>>) under a skirt, dress or shorts; legwear does not replace the bottom or footwear. When the source item is legwear, build every outfit around a skirt, dress or shorts
 
 For each outfit, explain WHY the items complement the source item (color harmony, style match, formality level).
@@ -34,3 +36,6 @@ RULES:
 - Consider color coordination and occasion formality
 - Explain the pairing logic in highlights
 - Output ONLY the JSON array, no other text
+
+
+LANGUAGE: Write every human-readable text value (titles, reasons, tips, descriptions) in Traditional Chinese as used in Taiwan (繁體中文，台灣用語). Keep JSON keys and item numbers unchanged. Never use the ASCII double-quote character inside text values (use 「」 instead) so the JSON stays valid.

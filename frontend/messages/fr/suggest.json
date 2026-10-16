@@ -102,5 +102,10 @@
     "reset": "Réinitialiser",
     "temperature": "Température"
   },
-  "yourOutfit": "Votre tenue"
+  "yourOutfit": "Votre tenue",
+  "eventNotes": {
+    "title": "Event notes (optional)",
+    "subtitle": "Today's event, venue or dress code — the AI gives it priority",
+    "placeholder": "e.g. Client pitch, blazer required; friend's wedding, semi-formal, avoid all white"
+  }
 }

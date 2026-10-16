@@ -45,6 +45,14 @@ AVAILABLE ITEMS:
 
 {mandatory_items_section}
 
+ONE FORMALITY LEVEL PER OUTFIT (most important — check every piece before answering):
+- Decide the outfit's level first, then use only pieces from that level or the one next to it:
+  casual (tees, sweatshirts, jeans, drawstring/elastic pants, shorts, sneakers, caps)
+  → smart casual (polos, knits, casual shirts, chinos, pleated or wide-leg trousers, loafers, suede shoes, clean leather sneakers)
+  → business (dress shirts, tailored trousers, blazers, suits, oxfords, brogues, derbies, leather belt)
+- Never mix the two ends: no dress shoes (oxfords/brogues/derbies) with sweatpants, drawstring trousers, shorts, tees or caps; no sneakers or caps with a suit
+- Shoes set the tone: pick the shoes AFTER the top and bottom, and choose the pair that sits at the same formality level[[STYLE_NOTES]]
+
 RULES:
 - Build the look around ONE of these silhouettes. They are equally valid; choose whichever suits the wardrobe and the occasion, do not assume separates:
   - Separates: ONE top (<<BASE_TOP_TYPES>>) + ONE bottom (<<BOTTOM_TYPES>>) + ONE footwear (<<FOOTWEAR_TYPES>>)
@@ -52,13 +60,18 @@ RULES:
   - Suit: ONE top + ONE suit (<<SUIT_TYPES>>) + ONE footwear; the suit replaces the bottom
 - OPTIONAL: legwear (<<LEGWEAR_TYPES>>) under a skirt, dress or shorts in cool or cold weather; leave it out when it is warm, and put only thermal legwear under trousers or a jumpsuit, only when it is very cold. Legwear does not replace the bottom, the one-piece garment or footwear
 - OPTIONAL: ONE bag if appropriate for the occasion
-- OPTIONAL: accessories (belt, scarf, hat, jewelry) that genuinely complement the outfit
+- Eyewear is REQUIRED whenever the wardrobe has it: ONE pair of glasses/sunglasses (eyewear may be listed as "accessories" — check the item description)
+- Hat/cap is OPTIONAL: add one only when the outfit is casual or relaxed smart-casual AND the cap's color and fabric match. NEVER put a cap with dress shoes (oxfords, brogues, derbies), a suit, a blazer, or tailored trousers
+- SHOES ARE MANDATORY: every outfit MUST contain exactly ONE footwear item (shoes, sneakers, boots, sandals, loafers). An outfit without a footwear item number is INVALID. The same pair of shoes may be reused across the 3 outfits if the wardrobe has few shoes
+- Eyewear: an item listed as "glasses (accessories)" is a pair of glasses; include ONE in every outfit when available
+- OPTIONAL: other accessories (belt, scarf, jewelry) that genuinely complement the outfit. A belt only goes with trousers/jeans that have belt loops — never with elastic, drawstring or pull-on waists. Match belt leather color to the shoes
 - For cold or rainy weather, add outerwear (jacket/coat) if available
-- Every piece must earn its place — do not add items just to fill slots
+- Every optional piece must earn its place — do not add extra items just to fill slots
 - Do NOT pick the same item number twice
 - Return item NUMBERS only
+- LANGUAGE: write "headline", "highlights" and "styling_tip" in Traditional Chinese as used in Taiwan (繁體中文，台灣用語); keep JSON keys in English; headline max 12 Chinese characters; never use the ASCII double-quote character inside text values (use 「」 instead) so the JSON stays valid
 
 Respond with valid JSON containing exactly 3 distinct outfit options. Each must be a complete look.
 {{"outfits": [{{"items": [item numbers], "headline": "Short catchy outfit title (max 5 words)", "highlights": ["One short sentence each — vary your reasoning across color, texture, proportion, occasion, weather, or time of day"], "styling_tip": "One specific, actionable styling detail — do not suggest rolling up sleeves every time, vary your advice"}}, ...]}}
 
-Each outfit MUST use different key pieces (different tops, bottoms, one-piece garments or suits). Vary color palettes and energy levels. First outfit = strongest recommendation.
+Each outfit MUST use different key pieces (different tops, bottoms, one-piece garments or suits; shoes, hats and glasses may repeat). Vary color palettes and energy levels. First outfit = strongest recommendation.

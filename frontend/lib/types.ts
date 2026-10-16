@@ -379,6 +379,7 @@ export interface SuggestRequest {
   };
   exclude_items?: string[];
   include_items?: string[];
+  event_notes?: string;
 }
 
 // Pairing types

@@ -30,8 +30,10 @@ import {
   Plus,
   X,
   Layers,
+  PenLine,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -595,6 +597,7 @@ function SuggestContent() {
   const [selectedOccasion, setSelectedOccasion] = useState<string | null>(null);
   const [occasionInitialized, setOccasionInitialized] = useState(false);
   const [weatherOverride, setWeatherOverride] = useState<WeatherOverride | null>(null);
+  const [eventNotes, setEventNotes] = useState('');
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [isItemPickerOpen, setIsItemPickerOpen] = useState(false);
   const [filterType, setFilterType] = useState<string | undefined>(undefined);
@@ -639,6 +642,11 @@ function SuggestContent() {
           precipitation_chance: weatherOverride.condition === 'rainy' ? 80 : weatherOverride.condition === 'cloudy' ? 30 : 10,
           condition: weatherOverride.condition,
         };
+      }
+
+      const notes = eventNotes.trim().slice(0, 500);
+      if (notes) {
+        request.event_notes = notes;
       }
 
       const result = await api.post<Outfit[]>('/outfits/suggest-options', request);
@@ -843,6 +851,25 @@ function SuggestContent() {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Event notes (optional) */}
+              <div className="space-y-3 pt-1 border-t">
+                <div className="space-y-0.5">
+                  <label htmlFor="event-notes" className="font-semibold text-sm sm:text-base flex items-center gap-2">
+                    <PenLine className="h-4 w-4 text-primary" />
+                    {t('eventNotes.title')}
+                  </label>
+                  <p className="text-xs text-muted-foreground">{t('eventNotes.subtitle')}</p>
+                </div>
+                <Textarea
+                  id="event-notes"
+                  value={eventNotes}
+                  onChange={(e) => setEventNotes(e.target.value)}
+                  placeholder={t('eventNotes.placeholder')}
+                  maxLength={500}
+                  rows={3}
+                />
               </div>
 
               {/* Weather override (collapsible) */}
