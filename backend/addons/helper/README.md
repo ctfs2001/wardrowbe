@@ -13,12 +13,12 @@
 
 ## 執行方式
 
-在 backend 映像裡執行，跟後端共用設定（資料庫、儲存路徑、AI 端點）：
+程式放在 `backend/` 底下，所以會跟著打包進 backend 映像。用同一個映像、換一個指令執行，跟後端共用設定（資料庫、儲存路徑、AI 端點）：
 
 ```yaml
 helper:
   image: <backend 映像>
-  command: python /helper/wardrobe_helper.py
+  command: python /app/addons/helper/wardrobe_helper.py
   environment:
     PYTHONPATH: /app
     BG_REMOVAL_PROVIDER: rembg
@@ -26,7 +26,6 @@ helper:
   volumes:
     - <資料目錄>:/data/wardrobe
     - <rembg 模型目錄>:/opt/rembg/models
-    - ./addons/helper:/helper:ro
 ```
 
 ## 環境變數

@@ -85,13 +85,18 @@ def to_b64(img: Image.Image, max_px: int = 1536) -> str:
 
 
 async def ask_model(
-    client: httpx.AsyncClient, img: Image.Image, item_type: str, prompt: str | None = None,
+    client: httpx.AsyncClient,
+    img: Image.Image,
+    item_type: str,
+    prompt: str | None = None,
     extra_images: list | None = None,
 ) -> dict:
     text = (prompt or PROMPT).replace("{item_type}", item_type or "unknown")
     content = [{"type": "text", "text": text}]
     for im in [img, *(extra_images or [])]:
-        content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{to_b64(im)}"}})
+        content.append(
+            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{to_b64(im)}"}}
+        )
     body = {
         "model": MODEL,
         "messages": [{"role": "user", "content": content}],
@@ -122,10 +127,14 @@ def crop_to_box(img: Image.Image, box) -> Image.Image:
         y0, x0, y1, x1 = (max(0, min(1000, int(v))) for v in box)
         if y1 - y0 > 50 and x1 - x0 > 50:
             mx, my = int((x1 - x0) * w / 1000 * 0.04), int((y1 - y0) * h / 1000 * 0.04)
-            return img.crop((
-                max(0, x0 * w // 1000 - mx), max(0, y0 * h // 1000 - my),
-                min(w, x1 * w // 1000 + mx), min(h, y1 * h // 1000 + my),
-            ))
+            return img.crop(
+                (
+                    max(0, x0 * w // 1000 - mx),
+                    max(0, y0 * h // 1000 - my),
+                    min(w, x1 * w // 1000 + mx),
+                    min(h, y1 * h // 1000 + my),
+                )
+            )
     return img
 
 
@@ -149,7 +158,6 @@ def tidy(img: Image.Image, box, kind: str) -> tuple[Image.Image, str]:
             if bw * bh >= 0.35 * crop.size[0] * crop.size[1]:
                 return on_square(cut.crop(bbox)), "cut-out"
     return on_square(crop), "cropped"
-
 
 
 # ---------------------------------------------------------------- reverse image search
@@ -197,18 +205,24 @@ def save_web_state(state: dict) -> None:
 
 
 async def vision_web_detect(client: httpx.AsyncClient, img: Image.Image) -> dict:
-    body = {"requests": [{
-        "image": {"content": to_b64(img, 1024)},
-        "features": [{"type": "WEB_DETECTION", "maxResults": 10}],
-        "imageContext": {"webDetectionParams": {"includeGeoResults": True}},
-    }]}
+    body = {
+        "requests": [
+            {
+                "image": {"content": to_b64(img, 1024)},
+                "features": [{"type": "WEB_DETECTION", "maxResults": 10}],
+                "imageContext": {"webDetectionParams": {"includeGeoResults": True}},
+            }
+        ]
+    }
     r = await client.post(VISION_URL, params={"key": VISION_KEY}, json=body)
     if r.status_code >= 400:
         raise RuntimeError(f"Vision API {r.status_code}: {r.text[:300]}")
     web = r.json()["responses"][0].get("webDetection", {})
     return {
         "best_guess": [b.get("label") for b in web.get("bestGuessLabels", [])],
-        "entities": [e.get("description") for e in web.get("webEntities", []) if e.get("description")][:10],
+        "entities": [
+            e.get("description") for e in web.get("webEntities", []) if e.get("description")
+        ][:10],
         "pages": [
             {"title": p.get("pageTitle", "")[:200], "url": p.get("url")}
             for p in web.get("pagesWithMatchingImages", [])[:10]
@@ -221,9 +235,12 @@ def _clean(v) -> str:
     return "" if v.lower() in ("null", "none", "unknown", "n/a") else v
 
 
-async def grounded_identify(client: httpx.AsyncClient, images: list, item_type: str, hints: dict) -> dict:
+async def grounded_identify(
+    client: httpx.AsyncClient, images: list, item_type: str, hints: dict
+) -> dict:
     prompt = WEB_PROMPT.replace("{item_type}", item_type or "unknown").replace(
-        "{results}", json.dumps(hints, ensure_ascii=False))
+        "{results}", json.dumps(hints, ensure_ascii=False)
+    )
     parts = [{"text": prompt}] + [
         {"inline_data": {"mime_type": "image/jpeg", "data": to_b64(im)}} for im in images
     ]
@@ -257,7 +274,11 @@ async def resolve_url(client: httpx.AsyncClient, url: str) -> str:
 async def web_lookup(session: AsyncSession, client: httpx.AsyncClient, item: ClothingItem) -> str:
     current = Image.open(STORAGE / item.image_path).convert("RGB")
     backup = item.original_image_path
-    original = Image.open(STORAGE / backup).convert("RGB") if backup and (STORAGE / backup).exists() else current
+    original = (
+        Image.open(STORAGE / backup).convert("RGB")
+        if backup and (STORAGE / backup).exists()
+        else current
+    )
     hints = {}
     try:
         hints = await vision_web_detect(client, original)

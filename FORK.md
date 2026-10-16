@@ -13,7 +13,7 @@
 | AI 回覆解析失敗時記錄全文 | `recommendation_service.py`（`_parse_ai_response`） | 方便除錯 |
 | 提示詞 | `backend/app/prompts/recommendation.txt`、`item_pairing.txt` | 正式度一致、必配鞋和眼鏡、皮帶規則、繁體中文輸出 |
 | 個人風格 | 環境變數 `STYLE_NOTES`（`backend/app/config.py`） | 自由文字的穿衣風格描述，會加進推薦提示詞。內容不放在公開 repo，由主機設定 |
-| helper 附加服務 | `addons/helper/` | 整理照片、讀品牌和材質、以圖搜圖查商品資訊，見該目錄的 README |
+| helper 附加服務 | `backend/addons/helper/` | 整理照片、讀品牌和材質、以圖搜圖查商品資訊，見該目錄的 README。放在 `backend/` 底下是為了一起打包進 backend 映像 |
 
 這些修改的測試在 `backend/tests/test_local_customizations.py`。
 
