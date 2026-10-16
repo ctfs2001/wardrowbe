@@ -10,7 +10,9 @@ Create {num_pairings} DIFFERENT complete outfits. Each MUST:
 - Include the source item [{source_number}]
 - Have: exactly ONE top + ONE bottom + ONE shoes (or ONE dress/jumpsuit + shoes)
 - NEVER combine two items from the same slot. Bottoms (pants, jeans, shorts, skirt) are the SAME slot. Tops (shirt, t-shirt, blouse, sweater, hoodie, polo, tank-top, cardigan, vest) are the SAME slot.
-- Optionally add accessories (belt, bag, jewelry, scarf) if they complement
+- SHOES ARE MANDATORY: include exactly ONE footwear item in every outfit (the same shoes may repeat across outfits). An outfit without footwear is INVALID
+- Include ONE pair of glasses ("glasses (accessories)") in every outfit when the wardrobe has them; add a hat/cap only for casual looks, never with dress shoes, tailored trousers or a blazer. Keep every piece at the same formality level (casual, smart casual or business) and only use a belt with trousers that have belt loops
+- Optionally add other accessories (belt, bag, jewelry, scarf) if they complement
 - Optionally add tights under a skirt, dress or shorts; tights do not replace the bottom or shoes. When the source item is tights, build every outfit around a skirt, dress or shorts
 
 For each outfit, explain WHY the items complement the source item (color harmony, style match, formality level).
@@ -30,3 +32,6 @@ RULES:
 - Consider color coordination and occasion formality
 - Explain the pairing logic in highlights
 - Output ONLY the JSON array, no other text
+
+
+LANGUAGE: Write every human-readable text value (titles, reasons, tips, descriptions) in Traditional Chinese as used in Taiwan (繁體中文，台灣用語). Keep JSON keys and item numbers unchanged. Never use the ASCII double-quote character inside text values (use 「」 instead) so the JSON stays valid.
