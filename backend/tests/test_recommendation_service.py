@@ -859,6 +859,8 @@ class TestHotDayLegwear:
             }
             cached = json.loads(json.dumps(cached))
         rejected = {items[3].id} if unavailable == "rejected" else set()
+        # A fresh prompt only lists items that are still available.
+        fresh_number_map = {n: i for n, i in number_map.items() if not (unavailable and n == 4)}
         service = RecommendationService(db_session)
         with (
             patch("app.services.recommendation_service.AIService", return_value=ai),
@@ -867,7 +869,7 @@ class TestHotDayLegwear:
                 AsyncMock(side_effect=[cached, None]),
             ) as pop,
             patch("app.services.recommendation_service.push_suggestions", AsyncMock()) as push,
-            patch.object(service, "_format_items_for_prompt", return_value=("", number_map)),
+            patch.object(service, "_format_items_for_prompt", return_value=("", fresh_number_map)),
             patch.object(service, "_get_today_rejected_item_ids", AsyncMock(return_value=rejected)),
         ):
             outfits = await service.generate_recommendations(
@@ -892,7 +894,8 @@ class TestHotDayLegwear:
         items, outfits = await self._hot_day_outfits(
             db_session, test_user, [[3, 2], [1], [2, 4], [3]], count=2
         )
-        assert outfits == [{items[2].id, items[1].id}, {items[1].id, items[3].id}]
+        # The first look gets the sneakers added: every outfit has shoes.
+        assert outfits == [{items[2].id, items[1].id, items[3].id}, {items[1].id, items[3].id}]
         assert self.pushed == [[3]]
 
     @pytest.mark.asyncio

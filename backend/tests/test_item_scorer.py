@@ -7,6 +7,7 @@ from app.models.item import ClothingItem
 from app.models.preference import UserPreference
 from app.services.item_scorer import (
     MIN_ITEMS_FOR_SCORING,
+    TOP_N,
     _formality_score,
     _pair_bonus,
     _preference_score,
@@ -464,7 +465,7 @@ class TestScoreItems:
         assert coat_pos < shorts_pos
 
     def test_returns_top_n(self):
-        items = [_item() for _ in range(100)]
+        items = [_item() for _ in range(TOP_N + 30)]
         result = score_items(
             items=items,
             weather=_weather(),
@@ -476,7 +477,7 @@ class TestScoreItems:
             good_pairs={},
             recently_worn_dates={},
         )
-        assert len(result) <= 70
+        assert len(result) == TOP_N
 
     def test_prioritizes_mandatory_items_into_top_n(self):
         items = [_item(type="shirt") for _ in range(100)]

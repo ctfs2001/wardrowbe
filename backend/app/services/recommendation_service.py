@@ -40,6 +40,7 @@ from app.services.weather_service import (
     WeatherServiceError,
 )
 from app.utils.clothing import canonical_item_order, deduplicate_by_body_slot, remove_legwear
+from app.utils.garment_vocabulary import ITEM_ROLE
 from app.utils.preference_defaults import (
     DEFAULT_LAYERING_PREFERENCE,
     DEFAULT_TEMPERATURE_SENSITIVITY,
@@ -136,6 +137,29 @@ class RecommendationContext:
 
 RECOMMENDATION_PROMPT = load_prompt("recommendation")
 
+EVENT_NOTES_MAX = 500
+EVENT_NOTES_PREFIX = "活動備註："
+
+# Item types that may be worn again any day: the no-repeat window and today's rejections
+# only apply to clothes, otherwise a small wardrobe runs out of shoes, hats and glasses.
+_REPEAT_OK_TYPES = {"hat", "belt", "accessories"}
+
+
+def _repeat_ok(item_type: str | None) -> bool:
+    t = (item_type or "").lower()
+    return t in _REPEAT_OK_TYPES or ITEM_ROLE.get(t) == "footwear"
+
+
+def _add_event_notes(prompt: str, notes: str) -> str:
+    """Put the user's event notes right after the occasion line of the stylist prompt."""
+    line = (
+        "- EVENT DETAILS FROM THE USER (top priority; follow any dress code, venue, activity, "
+        "color or formality requirement stated here, even over the generic occasion, and say in "
+        "the highlights how the outfit fits it): " + notes.replace("\n", " ")
+    )
+    new = re.sub(r"(- Occasion: [^\n]*\n)", lambda m: m.group(1) + line + "\n", prompt, count=1)
+    return new if new != prompt else line + "\n\n" + prompt
+
 
 class RecommendationService:
     def __init__(self, db: AsyncSession):
@@ -186,7 +210,15 @@ class RecommendationService:
                 )
             )
         )
-        return {row[0]: row[1] for row in result.all()}
+        dates = {row[0]: row[1] for row in result.all()}
+        if dates:
+            rows = await self.db.execute(
+                select(ClothingItem.id, ClothingItem.type).where(ClothingItem.id.in_(list(dates)))
+            )
+            for r in rows:
+                if _repeat_ok(r.type):
+                    dates.pop(r.id, None)
+        return dates
 
     async def _get_today_rejected_item_ids(self, user: User, occasion: str) -> set[UUID]:
         user_today = get_user_today(user)
@@ -203,7 +235,19 @@ class RecommendationService:
             )
             .distinct()
         )
-        return set(result.scalars().all())
+        ids = set(result.scalars().all())
+        # Dismissing an outfit bans all its items for the day. With few shoes, hats and glasses
+        # that leaves none, so keep those available; tops and bottoms are still excluded.
+        if ids:
+            rows = await self.db.execute(
+                select(ClothingItem.id, ClothingItem.type).where(ClothingItem.id.in_(list(ids)))
+            )
+            ids -= {
+                r.id
+                for r in rows
+                if ITEM_ROLE.get((r.type or "").lower()) in ("footwear", "accessory")
+            }
+        return ids
 
     async def _get_recently_worn_outfit_combinations(
         self, user: User, days: int = 7
@@ -330,7 +374,8 @@ class RecommendationService:
             # Recency annotation
             if item.last_worn_at:
                 days_ago = (user_today - item.last_worn_at).days
-                if 0 <= days_ago <= 14:
+                # Items that may repeat don't get the note, so the AI doesn't avoid them.
+                if 0 <= days_ago <= 14 and not _repeat_ok(item.type):
                     parts.append(f"worn {days_ago} days ago")
             else:
                 parts.append("never worn")
@@ -621,6 +666,7 @@ class RecommendationService:
                         except json.JSONDecodeError:
                             break
 
+        logger.warning(f"Unparsable AI reply len={len(content or '')}: {content!r}")
         raise ValueError(f"Could not parse AI response as JSON: {content[:200]}")
 
     def _parse_multi_outfit_response(self, content: str) -> list[dict]:
@@ -639,6 +685,33 @@ class RecommendationService:
 
         return [parsed]
 
+    async def _ensure_footwear(
+        self,
+        valid_ids: list[UUID],
+        item_type_map: dict[UUID, str],
+        number_map: dict[int, UUID],
+    ) -> tuple[list[UUID], dict[UUID, str]]:
+        """Every outfit needs shoes: if none were picked, add the best-ranked footwear candidate.
+
+        Runs after the empty-outfit check, so an option with nothing else left to wear is
+        still skipped instead of becoming a shoes-only outfit.
+        """
+        if any(ITEM_ROLE.get(item_type_map.get(i, "")) == "footwear" for i in valid_ids):
+            return valid_ids, item_type_map
+        rows = await self.db.execute(
+            select(ClothingItem.id, ClothingItem.type).where(
+                ClothingItem.id.in_(list(number_map.values()))
+            )
+        )
+        candidate_types = {r.id: (r.type or "").lower() for r in rows}
+        # Lower number = ranked higher by the scorer.
+        for n in sorted(number_map):
+            item_id = number_map[n]
+            if ITEM_ROLE.get(candidate_types.get(item_id, "")) == "footwear":
+                logger.info(f"Adding footwear #{n} to outfit without shoes")
+                return valid_ids + [item_id], {**item_type_map, item_id: candidate_types[item_id]}
+        return valid_ids, item_type_map
+
     async def _materialize_outfit(
         self,
         outfit_data: dict,
@@ -650,6 +723,7 @@ class RecommendationService:
         scheduled_date: date | None = None,
         mandatory_item_ids: set[UUID] | None = None,
         drop_legwear: bool = False,
+        event_notes: str | None = None,
     ) -> Outfit:
         selected_numbers = outfit_data.get("items", [])
         valid_ids = []
@@ -696,6 +770,7 @@ class RecommendationService:
             valid_ids = remove_legwear(valid_ids, item_type_map, mandatory_item_ids or set())
         if not valid_ids:
             raise EmptyOutfitError("AI did not select any valid items")
+        valid_ids, item_type_map = await self._ensure_footwear(valid_ids, item_type_map, number_map)
         valid_ids = canonical_item_order(valid_ids, item_type_map)
 
         reasoning = outfit_data.get("headline") or outfit_data.get("reasoning")
@@ -708,6 +783,8 @@ class RecommendationService:
             scheduled_for=scheduled_date or get_user_today(user),
             reasoning=reasoning,
             style_notes=style_notes,
+            # Kept on the outfit so the event shows up later in the outfit history.
+            notes=EVENT_NOTES_PREFIX + event_notes if event_notes else None,
             ai_raw_response=outfit_data,
             source=source,
             status=OutfitStatus.pending,
@@ -761,6 +838,7 @@ class RecommendationService:
         count: int = 1,
         single_outfit: bool = False,
         scheduled_date: date | None = None,
+        event_notes: str | None = None,
     ) -> list[Outfit]:
         # Guard first so deferral is unconditional, before any location/weather work.
         require_internal_ai("text")
@@ -772,7 +850,9 @@ class RecommendationService:
             time_of_day = get_time_of_day(user)
 
         # Determine cache eligibility before auto-merge
-        use_cache = not exclude_items and not single_outfit
+        event_notes = (event_notes or "").strip()[:EVENT_NOTES_MAX] or None
+        # Looks made for a specific event must not be cached and reused for a normal request.
+        use_cache = not exclude_items and not single_outfit and not event_notes
 
         # Auto-exclude today's rejected items for this occasion
         rejected_ids = await self._get_today_rejected_item_ids(user, occasion)
@@ -871,7 +951,13 @@ class RecommendationService:
                     )
                     continue
                 cached_number_map = cached.pop("_number_map", {})
-                number_map = {int(k): UUID(v) for k, v in cached_number_map.items()}
+                # Only items that are still available, so _ensure_footwear can't add shoes
+                # that were archived, sent to the wash or rejected since this was cached.
+                number_map = {
+                    int(k): UUID(v)
+                    for k, v in cached_number_map.items()
+                    if UUID(v) in candidate_ids
+                }
 
                 cached_item_ids = set()
                 for num in cached.get("items", []):
@@ -962,6 +1048,8 @@ class RecommendationService:
             items_text=items_text,
             mandatory_items_section=mandatory_items_section,
         )
+        if event_notes:
+            prompt = _add_event_notes(prompt, event_notes)
 
         # For single_outfit mode (notifications), replace multi-outfit format
         if single_outfit:
@@ -1002,6 +1090,7 @@ class RecommendationService:
                     scheduled_date=scheduled_date,
                     mandatory_item_ids=set(include_items) if include_items else None,
                     drop_legwear=drop_legwear,
+                    event_notes=event_notes,
                 )
                 return [outfit]
 
@@ -1027,6 +1116,7 @@ class RecommendationService:
                         scheduled_date=scheduled_date,
                         mandatory_item_ids=set(include_items) if include_items else None,
                         drop_legwear=drop_legwear,
+                        event_notes=event_notes,
                     )
                 except EmptyOutfitError:
                     logger.warning("AI outfit option has nothing left to wear, skipping")
