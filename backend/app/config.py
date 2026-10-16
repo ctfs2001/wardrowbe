@@ -100,6 +100,9 @@ class Settings(BaseSettings):
     ai_max_retries: int = Field(default=3)
     ai_max_tokens: int = Field(default=8000)
     ai_reasoning_effort: str | None = Field(default="none")
+    # Free-text description of the user's own style for the stylist prompt. Kept out of the
+    # repo on purpose: set STYLE_NOTES on the host.
+    style_notes: str = Field(default="")
 
     @field_validator("ai_reasoning_effort", mode="before")
     @classmethod

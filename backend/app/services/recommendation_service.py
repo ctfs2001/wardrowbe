@@ -10,6 +10,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.config import get_settings
 from app.models.item import ClothingItem, ItemStatus
 from app.models.learning import ItemPairScore, UserLearningProfile
 from app.models.outfit import (
@@ -148,6 +149,11 @@ _REPEAT_OK_TYPES = {"hat", "belt", "accessories"}
 def _repeat_ok(item_type: str | None) -> bool:
     t = (item_type or "").lower()
     return t in _REPEAT_OK_TYPES or ITEM_ROLE.get(t) == "footwear"
+
+
+def _style_notes_line() -> str:
+    notes = " ".join(get_settings().style_notes.split())
+    return f"\n- The user's own style: {notes}" if notes else ""
 
 
 def _add_event_notes(prompt: str, notes: str) -> str:
@@ -1048,6 +1054,8 @@ class RecommendationService:
             items_text=items_text,
             mandatory_items_section=mandatory_items_section,
         )
+        # Filled after format() so the template keeps the same placeholders as upstream.
+        prompt = prompt.replace("[[STYLE_NOTES]]", _style_notes_line())
         if event_notes:
             prompt = _add_event_notes(prompt, event_notes)
 

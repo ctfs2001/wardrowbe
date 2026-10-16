@@ -11,7 +11,8 @@
 | 鞋子、配件可重複 | `recommendation_service.py`（`_repeat_ok`） | 「N 天內不重複」和「今天拒絕過的不再推」只套用在衣服上；鞋、帽、眼鏡、皮帶可以天天穿 |
 | 候選品項上限 | `backend/app/services/item_scorer.py`（`TOP_N`） | 70 → 200，避免帽子、眼鏡、鞋子被擠出清單 |
 | AI 回覆解析失敗時記錄全文 | `recommendation_service.py`（`_parse_ai_response`） | 方便除錯 |
-| 提示詞 | `backend/app/prompts/recommendation.txt`、`item_pairing.txt` | 正式度一致、個人風格、必配鞋和眼鏡、皮帶規則、繁體中文輸出 |
+| 提示詞 | `backend/app/prompts/recommendation.txt`、`item_pairing.txt` | 正式度一致、必配鞋和眼鏡、皮帶規則、繁體中文輸出 |
+| 個人風格 | 環境變數 `STYLE_NOTES`（`backend/app/config.py`） | 自由文字的穿衣風格描述，會加進推薦提示詞。內容不放在公開 repo，由主機設定 |
 | helper 附加服務 | `addons/helper/` | 整理照片、讀品牌和材質、以圖搜圖查商品資訊，見該目錄的 README |
 
 這些修改的測試在 `backend/tests/test_local_customizations.py`。

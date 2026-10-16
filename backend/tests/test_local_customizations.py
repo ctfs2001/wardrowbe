@@ -15,6 +15,7 @@ from app.services.recommendation_service import (
     RecommendationService,
     _add_event_notes,
     _repeat_ok,
+    _style_notes_line,
 )
 from app.services.weather_service import WeatherData
 from app.utils.timezone import get_user_today
@@ -67,6 +68,18 @@ class TestEventNotesPrompt:
         out = _add_event_notes("Pick an outfit.", "wedding")
         assert out.startswith("- EVENT DETAILS FROM THE USER")
         assert out.endswith("\n\nPick an outfit.")
+
+
+class TestStyleNotes:
+    def test_empty_by_default(self):
+        with patch("app.services.recommendation_service.get_settings") as settings:
+            settings.return_value.style_notes = "  "
+            assert _style_notes_line() == ""
+
+    def test_set_on_the_host(self):
+        with patch("app.services.recommendation_service.get_settings") as settings:
+            settings.return_value.style_notes = "minimal,\n earth tones"
+            assert _style_notes_line() == "\n- The user's own style: minimal, earth tones"
 
 
 class TestRepeatOk:
@@ -209,6 +222,7 @@ class TestEventNotesSuggestions:
             db_session, test_user, "  wedding, avoid all white  "
         )
         assert "EVENT DETAILS FROM THE USER" in prompt
+        assert "[[STYLE_NOTES]]" not in prompt
         assert "wedding, avoid all white" in prompt
         pop.assert_not_awaited()
         push.assert_not_awaited()
