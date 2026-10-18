@@ -196,6 +196,23 @@ def _response_rejects_reasoning_effort(response: httpx.Response) -> bool:
 _CONFIDENCE_FIELDS = {"type", "primary_color", "pattern", "material", "formality"}
 
 
+def _log_token_usage(task_name: str, endpoint_name: str, model: str, data: dict) -> None:
+    # Every answered request is billed, including cut-off ones, so this runs before the
+    # empty-response check. Thinking tokens are billed as output; providers report them
+    # under completion_tokens_details, or only as the gap in total_tokens.
+    usage = data.get("usage")
+    if not isinstance(usage, dict):
+        logger.info(f"AI usage: task={task_name} endpoint={endpoint_name} model={model} n/a")
+        return
+    details = usage.get("completion_tokens_details")
+    reasoning = details.get("reasoning_tokens") if isinstance(details, dict) else None
+    logger.info(
+        f"AI usage: task={task_name} endpoint={endpoint_name} model={model} "
+        f"prompt={usage.get('prompt_tokens')} completion={usage.get('completion_tokens')} "
+        f"reasoning={reasoning} total={usage.get('total_tokens')}"
+    )
+
+
 def compute_confidence_from_logprobs(logprobs_content: list[dict] | None) -> float | None:
     if not logprobs_content:
         return None
@@ -513,6 +530,7 @@ class AIService:
                                 logprobs_content = lp.get("content")
 
                         used_model = data.get("model", model)
+                        _log_token_usage(task_name, endpoint.name, used_model, data)
                         empty_error = _empty_response_error(
                             choice, endpoint.name, used_model, self.settings.ai_max_tokens
                         )
@@ -744,6 +762,7 @@ class AIService:
         prompt: str,
         system_prompt: str | None = None,
         return_metadata: bool = False,
+        task_name: str = "text generation",
     ) -> str | TextGenerationResult:
         messages = []
         if system_prompt:
@@ -792,6 +811,7 @@ class AIService:
                                 continue
                             raise _AIProviderResponseError(provider_error)
                         used_model = data.get("model", endpoint.text_model)
+                        _log_token_usage(task_name, endpoint.name, used_model, data)
                         choice = data["choices"][0]
                         message = choice["message"]
                         content = message.get("content")

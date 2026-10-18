@@ -223,7 +223,9 @@ class PairingService:
 
         # Call AI
         try:
-            result = await ai_service.generate_text(prompt, return_metadata=True)
+            result = await ai_service.generate_text(
+                prompt, return_metadata=True, task_name="pairing"
+            )
             logger.info(f"AI pairings generated (model: {result.model})")
             logger.debug(f"AI raw response: {result.content[:500]}")
             pairings_data = self._parse_ai_response(result.content)
