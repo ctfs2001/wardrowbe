@@ -1074,7 +1074,9 @@ class RecommendationService:
         )
 
         try:
-            result = await ai_service.generate_text(prompt, return_metadata=True)
+            result = await ai_service.generate_text(
+                prompt, return_metadata=True, task_name="recommendation"
+            )
             logger.info(
                 f"AI recommendation generated (model: {result.model}, endpoint: {result.endpoint})"
             )

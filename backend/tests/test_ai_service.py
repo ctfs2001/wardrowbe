@@ -973,3 +973,73 @@ class TestReasoningEffort:
                 await service.generate_text("suggest an outfit")
 
         assert mock_post.call_count == 1
+
+
+class TestTokenUsageLogging:
+    """Each answered request logs its token usage so the cost of a click can be worked out."""
+
+    @staticmethod
+    def _payload(usage: dict | None) -> dict:
+        payload = {
+            "model": "text-model",
+            "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
+        }
+        if usage is not None:
+            payload["usage"] = usage
+        return payload
+
+    @pytest.mark.asyncio
+    async def test_generate_text_logs_usage_with_task_name(self, caplog):
+        service = AIService()
+        usage = {
+            "prompt_tokens": 6100,
+            "completion_tokens": 900,
+            "total_tokens": 7400,
+            "completion_tokens_details": {"reasoning_tokens": 400},
+        }
+
+        with caplog.at_level("INFO", logger="app.services.ai_service"):
+            with patch("httpx.AsyncClient.post", return_value=_mock_response(self._payload(usage))):
+                await service.generate_text("suggest an outfit", task_name="recommendation")
+
+        assert (
+            "AI usage: task=recommendation endpoint=default model=text-model "
+            "prompt=6100 completion=900 reasoning=400 total=7400"
+        ) in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_tagging_logs_usage(self, caplog):
+        service = AIService()
+        usage = {"prompt_tokens": 1200, "completion_tokens": 80, "total_tokens": 1280}
+
+        with caplog.at_level("INFO", logger="app.services.ai_service"):
+            with patch("httpx.AsyncClient.post", return_value=_mock_response(self._payload(usage))):
+                await _complete(service, "tags")
+
+        assert "AI usage: task=tags" in caplog.text
+        assert "prompt=1200 completion=80 reasoning=None total=1280" in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_missing_usage_does_not_break_the_call(self, caplog):
+        service = AIService()
+
+        with caplog.at_level("INFO", logger="app.services.ai_service"):
+            with patch("httpx.AsyncClient.post", return_value=_mock_response(self._payload(None))):
+                content = await service.generate_text("suggest an outfit")
+
+        assert content == "ok"
+        assert "AI usage: task=text generation" in caplog.text
+        assert "n/a" in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_truncated_response_is_still_logged(self, caplog):
+        service = AIService()
+        payload = self._payload({"prompt_tokens": 10, "completion_tokens": 8000})
+        payload["choices"][0] = {"message": {"content": ""}, "finish_reason": "length"}
+
+        with caplog.at_level("INFO", logger="app.services.ai_service"):
+            with patch("httpx.AsyncClient.post", return_value=_mock_response(payload)):
+                with pytest.raises(AIResponseTruncatedError):
+                    await service.generate_text("suggest an outfit")
+
+        assert "completion=8000" in caplog.text
