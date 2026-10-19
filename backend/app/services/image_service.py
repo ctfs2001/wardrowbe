@@ -239,18 +239,63 @@ class ImageService:
 
     def _save_all_sizes(self, image: Image.Image, image_path: str) -> dict[str, str]:
         base_path = image_path.rsplit(".", 1)[0]
+        extension = Path(image_path).suffix.lower()
+        variant_extension = ".png" if extension == ".png" else ".jpg"
         paths = {}
         for variant in VARIANTS:
             # The original is written back to image_path itself so that the stored path stays valid.
-            path = image_path if variant is ORIGINAL else f"{base_path}{variant.suffix}.jpg"
-            (self.storage_path / path).write_bytes(self.encode_variant(image, variant))
+            path = (
+                image_path
+                if variant is ORIGINAL
+                else f"{base_path}{variant.suffix}{variant_extension}"
+            )
+            if extension == ".png":
+                resized = image.copy()
+                resized.thumbnail(variant.box, Image.Resampling.LANCZOS)
+                resized.save(self.storage_path / path, format="PNG")
+            else:
+                (self.storage_path / path).write_bytes(self.encode_variant(image, variant))
             paths[variant.path_field] = path
+        return paths
+
+    def store_product_photo(self, image_data: bytes, source_path: str) -> dict[str, str]:
+        """Validate real transparency before saving new variants and an undo backup."""
+        image = self._open_bounded(image_data, ".png")
+        if image.format != "PNG":
+            raise ValueError("Product photo must be PNG")
+        image = image.convert("RGBA")
+        alpha = image.getchannel("A")
+        if alpha.getextrema() != (0, 255):
+            raise ValueError(
+                "Product photo must contain transparent background and opaque clothing"
+            )
+        filename = self._generate_filename(".png")
+        relative = str(Path(source_path).parent / filename)
+        paths = {}
+        backup = str(Path(relative).with_suffix("")) + "_orig" + Path(source_path).suffix
+        try:
+            paths = self._save_all_sizes(image, relative)
+            shutil.copy2(self.storage_path / source_path, self.storage_path / backup)
+        except BaseException:
+            # Include partially written variants if a later save failed.
+            self.delete_images(
+                {
+                    **{
+                        v.path_field: str(Path(relative).with_suffix("")) + v.suffix + ".png"
+                        for v in VARIANTS
+                    },
+                    "backup": backup,
+                }
+            )
+            raise
+        paths["original_image_path"] = backup
         return paths
 
     def remove_background(
         self,
         image_path: str,
         bg_color: tuple[int, int, int] = (255, 255, 255),
+        original_backup_path: str | None = None,
     ) -> dict[str, str]:
         base_path = image_path.rsplit(".", 1)[0]
         original_full = self.storage_path / image_path
@@ -258,7 +303,7 @@ class ImageService:
         if not original_full.exists():
             raise ValueError(f"Image not found: {image_path}")
 
-        backup_path = f"{base_path}_orig.jpg"
+        backup_path = original_backup_path or f"{base_path}_orig{Path(image_path).suffix}"
         backup_full = self.storage_path / backup_path
         # First removal wins: a second removal must not overwrite the true
         # original with an already-processed image
@@ -283,7 +328,7 @@ class ImageService:
         if not backup_full.exists():
             raise ValueError(f"Backup not found: {backup_path}")
 
-        image = Image.open(backup_full).convert("RGB")
+        image = Image.open(backup_full).convert("RGBA" if image_path.endswith(".png") else "RGB")
         paths = self._save_all_sizes(image, image_path)
         backup_full.unlink()
         return paths
@@ -306,7 +351,9 @@ class ImageService:
 
         angle = -90 if direction == "cw" else 90  # PIL rotates counter-clockwise by default
 
-        image = _flatten_to_rgb(Image.open(original_full))
+        image = Image.open(original_full)
+        if not image_path.endswith(".png"):
+            image = _flatten_to_rgb(image)
 
         rotated = image.rotate(angle, expand=True)
 

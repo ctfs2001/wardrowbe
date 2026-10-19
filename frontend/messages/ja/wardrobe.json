@@ -205,6 +205,8 @@
     "type": "タイプ",
     "unrecognizedType": "AIは「{value}」と判定しましたが、対応していない種類です。下から最も近い種類を選んでください。「{value}」はサブタイプとして残せます。",
     "view": {
+    "productPhotoGenerated": "AI が生成した商品写真です。細部が異なる場合があります。「元の画像に戻す」で撮影した写真に戻せます。",
+    "productPhotoFailed": "商品写真の生成に失敗しました。元の写真と衣類の分析結果は保持されています。",
       "addedDate": "{date}に追加",
       "aiAnalysis": "AI分析",
       "aiAnalyzing": "AI分析中...",

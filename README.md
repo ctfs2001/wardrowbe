@@ -397,6 +397,50 @@ If browser geolocation is denied or unavailable, an optional fallback can approx
 
 </details>
 
+### Automatic product photos
+
+Enable `AI_PRODUCT_PHOTO_ENABLED=true` to turn suitable personal photos into
+front-facing, flat, catalog-style product photos with a transparent background.
+The existing vision analysis also assesses presentation quality. Only clear,
+unambiguous front views judged to need cleanup with confidence at least
+`AI_PRODUCT_PHOTO_MIN_CONFIDENCE` (default `0.85`) are redrawn. Catalog photos and
+uncertain, cropped or heavily occluded garments are left alone. A hanging garment
+can qualify even if its background was already removed.
+
+Configure a separate image-editing provider on the backend **and tagging worker**:
+
+```env
+AI_PRODUCT_PHOTO_ENABLED=true
+AI_IMAGE_BASE_URL=https://api.openai.com/v1
+AI_IMAGE_API_KEY=your-image-provider-key
+AI_IMAGE_MODEL=gpt-image-1.5
+AI_IMAGE_TIMEOUT=180
+AI_PRODUCT_PHOTO_MIN_CONFIDENCE=0.85
+```
+
+The bundled Compose files pass these variables to both processes. Other deployment
+manifests must pass them explicitly. Requires internal vision analysis; skipping
+AI analysis on upload also skips photo generation. The image provider must support
+JSON `POST /images/edits` with reference images, transparent PNG output and embedded
+`b64_json` results, as described in the [OpenAI image-edit API reference](https://developers.openai.com/api/reference/resources/images/methods/edit).
+Chat-only providers such as a text/vision Ollama endpoint are insufficient. Image
+credentials are independent of user-configured tagging endpoints.
+
+This sends the uploaded image to the configured provider and may incur additional
+charges and processing time. It runs only on first-time analysis, including bulk
+uploads; re-analysis never silently generates another photo. There are no automatic
+image-request retries, including on timeouts that may already have been billed.
+Existing items are not processed retroactively. No database migration is required.
+
+The prompt preserves color, cut, prints, logos, stitching, washed fabric and
+intentional distressing while smoothing accidental wrinkles. Generated images can
+still differ from the real item: the item dialog labels them as AI-generated and
+**Restore original** returns to the saved photo. Full, medium and thumbnail images
+all retain real PNG transparency. Duplicate detection keeps the source photo hash.
+If generation fails or returns an opaque/invalid image, the original photo remains
+visible and clothing analysis still completes; the dialog reports the failed photo
+step. The feature is disabled by default.
+
 ### Background Removal
 
 Works out of the box: the backend image ships rembg with the default `u2net` model already downloaded.

@@ -205,6 +205,8 @@
     "type": "Type",
     "unrecognizedType": "L’IA a détecté « {value} », qui n’est pas un type pris en charge. Choisissez le type le plus proche ci-dessous ; vous pouvez garder « {value} » comme sous-type.",
     "view": {
+    "productPhotoGenerated": "Photo produit générée par IA. Certains détails peuvent différer ; restaurez l’original pour retrouver votre photo.",
+    "productPhotoFailed": "La génération de la photo produit a échoué. Votre photo originale et l’analyse du vêtement ont été conservées.",
       "addedDate": "Ajouté le {date}",
       "aiAnalysis": "Analyse IA",
       "aiAnalyzing": "Analyse IA en cours...",

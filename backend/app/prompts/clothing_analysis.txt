@@ -41,5 +41,17 @@ spring, summer, fall, winter, all-season
 FIT (optional, pick one or null):
 slim, regular, relaxed, oversized, tailored, cropped
 
+PRODUCT_PHOTO: Assess presentation quality, not where the photo came from.
+Set needs_redraw=true only when ONE main garment's front and identifying details
+are clearly visible, but clutter, a hanger, awkward draping, accidental wrinkles,
+or uneven positioning prevent a clean catalog presentation. Already cut-out but
+draped/hanging garments can still need redraw. Set false for clean catalog images,
+flat-lays, and clear isolated product photos. Also set false when the front is
+hidden, the garment is heavily occluded/cropped, or multiple garments make the
+target ambiguous: do not invent missing product details. Intentional distressing,
+washed fabric, pleats, gathers and texture are garment features, not defects.
+confidence is a number from 0 to 1 measuring certainty in this decision.
+reason is a brief explanation (at most 500 characters).
+
 Output this exact JSON structure (a single object, NOT wrapped in an array):
-{"type":"TYPE","subtype":null,"primary_color":"COLOR","colors":["COLOR1"],"pattern":"PATTERN","material":null,"formality":"FORMALITY","style":["STYLE1"],"season":["SEASON1","SEASON2"],"fit":null}
+{"type":"TYPE","subtype":null,"primary_color":"COLOR","colors":["COLOR1"],"pattern":"PATTERN","material":null,"formality":"FORMALITY","style":["STYLE1"],"season":["SEASON1","SEASON2"],"fit":null,"product_photo":{"needs_redraw":false,"confidence":0.0,"reason":""}}
