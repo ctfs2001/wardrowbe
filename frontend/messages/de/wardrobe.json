@@ -205,6 +205,8 @@
     "type": "Typ",
     "unrecognizedType": "Die KI hat „{value}“ erkannt, das ist kein unterstützter Typ. Wähle unten den passendsten Typ; „{value}“ kannst du als Untertyp behalten.",
     "view": {
+    "productPhotoGenerated": "KI-generiertes Produktfoto. Details können abweichen. Mit „Original wiederherstellen“ kehren Sie zu Ihrem Foto zurück.",
+    "productPhotoFailed": "Das Produktfoto konnte nicht erstellt werden. Ihr Originalfoto und die Kleidungsanalyse bleiben erhalten.",
       "addedDate": "Hinzugefügt am {date}",
       "aiAnalysis": "KI-Analyse",
       "aiAnalyzing": "KI analysiert...",

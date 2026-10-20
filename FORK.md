@@ -6,6 +6,7 @@
 
 | 功能 | 位置 | 說明 |
 |---|---|---|
+| 自動重繪商品照 | `product_photo_service.py`、`tagging.py`、`product_photo.txt`、單品詳情 | 首次辨識時判斷照片是否需要整理，以獨立圖片編輯服務重繪透明 PNG；保留原圖可還原，預設關閉，設定見 README |
 | 活動／場合備註 | `frontend/app/dashboard/suggest/page.tsx`、`frontend/messages/*/suggest.json`、`backend/app/api/outfits.py`（`event_notes`）、`recommendation_service.py` | 推薦頁可以填今天的活動、地點或 dress code，AI 會優先參考。填了備註的推薦不進快取，備註也會存到套裝上，之後在歷史紀錄看得到 |
 | 每套都有鞋 | `recommendation_service.py`（`_ensure_footwear`） | AI 沒挑鞋時，自動補上評分最高的鞋 |
 | 鞋子、配件可重複 | `recommendation_service.py`（`_repeat_ok`） | 「N 天內不重複」和「今天拒絕過的不再推」只套用在衣服上；鞋、帽、眼鏡、皮帶可以天天穿 |

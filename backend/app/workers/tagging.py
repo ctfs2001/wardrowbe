@@ -13,6 +13,8 @@ from app.models.item import TAG_COLUMNS, ClothingItem, ItemStatus, TaggedBy, Tag
 from app.models.preference import UserPreference
 from app.models.user import User
 from app.services.ai_service import AIService, ClothingTags, repeats_identically
+from app.services.image_service import ImageService
+from app.services.product_photo_service import ProductPhotoService
 from app.utils.locale import DEFAULT_LOCALE
 from app.workers.db import get_db_session
 
@@ -47,7 +49,8 @@ def retry_delay_seconds(ctx: dict) -> int:
 
 def worker_job_timeout_seconds() -> int:
     settings = get_settings()
-    return max(settings.ai_timeout * settings.ai_max_retries + 60, 600)
+    base = max(settings.ai_timeout * settings.ai_max_retries + 60, 600)
+    return base + (settings.ai_image_timeout + 30 if settings.ai_product_photo_enabled else 0)
 
 
 def _tagging_call_budget(ai_service: AIService) -> float:
@@ -61,7 +64,11 @@ def _tagging_call_budget(ai_service: AIService) -> float:
     raw = endpoint_count * settings.ai_max_retries * 2 * settings.ai_timeout
     return max(
         MIN_CALL_BUDGET_SECONDS,
-        min(raw, worker_job_timeout_seconds() - CALL_BUDGET_MARGIN_SECONDS),
+        min(
+            raw,
+            max(settings.ai_timeout * settings.ai_max_retries + 60, 600)
+            - CALL_BUDGET_MARGIN_SECONDS,
+        ),
     )
 
 
@@ -212,6 +219,24 @@ async def tag_item_image(ctx: dict, item_id: str, image_path: str) -> dict[str, 
             if item is None:
                 raise ItemVanishedError(f"Item {item_id} not visible to worker")
 
+            source_path = item.image_path
+            # The worker can dequeue before the producer stores ai_job_id.
+            source_job_id = ctx.get("job_id") or item.ai_job_id
+            # Only first-time analysis is automatic. Re-tagging and restoring an
+            # original must never silently bill for another generation.
+            photo_eligible = (
+                not item.ai_processed
+                and not item.original_image_path
+                and not (item.tags or {}).get("product_photo")
+                and item.status == ItemStatus.processing
+                and ImageService().get_image_path(source_path).resolve() == path.resolve()
+            )
+            previous_photo = (item.tags or {}).get("product_photo")
+            if isinstance(previous_photo, dict) and previous_photo.get("status") == "generating":
+                # A previous worker died after claiming a possibly billed call.
+                # Finish tagging on retry without buying another generation.
+                item.tags = {**item.tags, "product_photo": {**previous_photo, "status": "failed"}}
+
             locale_result = await db.execute(select(User.locale).where(User.id == item.user_id))
             locale = locale_result.scalar_one_or_none() or DEFAULT_LOCALE
 
@@ -247,6 +272,55 @@ async def tag_item_image(ctx: dict, item_id: str, image_path: str) -> dict[str, 
             f"AI analysis complete for item {item_id}: type={tags.type}, color={tags.primary_color}"
         )
 
+        photo_metadata = None
+        generated_image = None
+        settings = get_settings()
+        assessment = tags.product_photo
+        if settings.ai_product_photo_enabled and photo_eligible and assessment is not None:
+            photo_metadata = {**assessment.model_dump(), "status": "skipped"}
+            if (
+                assessment.needs_redraw
+                and assessment.confidence >= settings.ai_product_photo_min_confidence
+            ):
+                # Persist the claim before the paid request. An arq retry after
+                # worker death or a failed final commit must not generate again.
+                db = get_db_session(ctx)
+                try:
+                    result = await db.execute(
+                        select(ClothingItem)
+                        .where(ClothingItem.id == UUID(item_id))
+                        .with_for_update()
+                    )
+                    current = result.scalar_one_or_none()
+                    if (
+                        current is None
+                        or current.status != ItemStatus.processing
+                        or current.image_path != source_path
+                        or current.ai_job_id not in (None, source_job_id)
+                        or current.ai_processed
+                        or current.original_image_path
+                        or (current.tags or {}).get("product_photo")
+                    ):
+                        return {"status": "skipped", "reason": "item changed", "item_id": item_id}
+                    current.tags = {
+                        **(current.tags or {}),
+                        "product_photo": {**photo_metadata, "status": "generating"},
+                    }
+                    await db.commit()
+                finally:
+                    await db.close()
+                try:
+                    generated_image = await asyncio.wait_for(
+                        ProductPhotoService().redraw(path), timeout=settings.ai_image_timeout
+                    )
+                except Exception as error:
+                    # Do not fail tagging, expose provider bodies/keys, or retry a
+                    # possibly billed request after an ambiguous timeout.
+                    logger.warning(
+                        "Product photo failed for %s (%s)", item_id, type(error).__name__
+                    )
+                    photo_metadata["status"] = "failed"
+
         # Update item in database
         db = get_db_session(ctx)
         try:
@@ -257,6 +331,43 @@ async def tag_item_image(ctx: dict, item_id: str, image_path: str) -> dict[str, 
 
             if item is None:
                 raise ItemVanishedError(f"Item {item_id} not visible to worker")
+
+            old_image_paths = None
+            new_photo_paths = None
+            if photo_metadata is not None and (
+                item.status != ItemStatus.processing
+                or item.image_path != source_path
+                or item.ai_job_id not in (None, source_job_id)
+            ):
+                return {"status": "skipped", "reason": "item changed", "item_id": item_id}
+            # Lock only for the final write, never across the external request.
+            # A cancelled job, replaced image or newer attempt owns its own photo.
+            if (
+                photo_metadata is not None
+                and item.status == ItemStatus.processing
+                and item.image_path == source_path
+                and item.ai_job_id in (None, source_job_id)
+                and not item.original_image_path
+                and not item.ai_processed
+            ):
+                if generated_image is not None:
+                    try:
+                        new_photo_paths = await asyncio.to_thread(
+                            ImageService().store_product_photo, generated_image, source_path
+                        )
+                        old_image_paths = {
+                            key: getattr(item, key)
+                            for key in ("image_path", "medium_path", "thumbnail_path")
+                        }
+                        for key, value in new_photo_paths.items():
+                            setattr(item, key, value)
+                        photo_metadata["status"] = "generated"
+                    except Exception as error:
+                        logger.warning(
+                            "Invalid product photo for %s (%s)", item_id, type(error).__name__
+                        )
+                        photo_metadata["status"] = "failed"
+                item.tags = {**(item.tags or {}), "product_photo": photo_metadata}
 
             # Unguarded by design: worst case after a cancel this backfills tags onto an
             # item the user already moved past, which is harmless (unlike the error path).
@@ -335,7 +446,19 @@ async def tag_item_image(ctx: dict, item_id: str, image_path: str) -> dict[str, 
 
             item.ai_completed_at = datetime.now(UTC)
 
-            await db.commit()
+            try:
+                await db.commit()
+            except BaseException:
+                if new_photo_paths:
+                    ImageService().delete_images(new_photo_paths)
+                raise
+            if old_image_paths:
+                # Source pHash intentionally stays unchanged for duplicate-upload
+                # detection, which should compare uploads rather than AI artwork.
+                try:
+                    ImageService().delete_images(old_image_paths)
+                except OSError:
+                    logger.warning("Could not clean old photo variants for %s", item_id)
             logger.info(f"Updated item {item_id} with AI tags (status=ready)")
 
             return {

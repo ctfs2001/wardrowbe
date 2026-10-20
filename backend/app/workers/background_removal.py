@@ -36,7 +36,7 @@ async def remove_item_background_job(ctx: dict, item_id: str, bg_color_hex: str)
         try:
             image_service = ImageService()
             out = await asyncio.to_thread(
-                image_service.remove_background, item.image_path, bg_color
+                image_service.remove_background, item.image_path, bg_color, item.original_image_path
             )
             item.original_image_path = out["original_backup_path"]
             item.status = ItemStatus.ready

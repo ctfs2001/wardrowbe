@@ -12,6 +12,12 @@ export interface ItemTags {
   formality?: string;
   fit?: string;
   logprobs_confidence?: number;
+  product_photo?: {
+    status: 'generating' | 'generated' | 'failed' | 'skipped';
+    needs_redraw: boolean;
+    confidence: number;
+    reason: string;
+  };
   // User-owned keys. The AI never emits these.
   size?: string;
   care_instructions?: string;

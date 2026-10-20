@@ -205,6 +205,8 @@
     "type": "類型",
     "unrecognizedType": "AI 辨識為「{value}」，但這不是支援的類型。請在下方選擇最接近的類型；可以將「{value}」保留為子類型。",
     "view": {
+    "productPhotoGenerated": "這是 AI 重繪的商品照，細節可能有差異；可點選「還原原圖」恢復原始照片。",
+    "productPhotoFailed": "商品照重繪失敗，已保留原始照片與衣物辨識結果。",
       "addedDate": "新增於 {date}",
       "aiAnalysis": "AI 分析",
       "aiAnalyzing": "AI 分析中...",

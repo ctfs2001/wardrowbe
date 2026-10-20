@@ -104,6 +104,15 @@ class Settings(BaseSettings):
     # repo on purpose: set STYLE_NOTES on the host.
     style_notes: str = Field(default="")
 
+    # Separate image-editing provider; never send uploads to a tagging endpoint
+    # merely because that endpoint supports chat completions.
+    ai_product_photo_enabled: bool = False
+    ai_image_base_url: str = ""
+    ai_image_api_key: str | None = None
+    ai_image_model: str = "gpt-image-1.5"
+    ai_image_timeout: int = Field(default=180, ge=1, le=600)
+    ai_product_photo_min_confidence: float = Field(default=0.85, ge=0, le=1)
+
     @field_validator("ai_reasoning_effort", mode="before")
     @classmethod
     def normalize_reasoning_effort(cls, v: str | None) -> str | None:

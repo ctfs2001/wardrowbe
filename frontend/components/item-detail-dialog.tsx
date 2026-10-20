@@ -987,6 +987,16 @@ export function ItemDetailDialog({ item, open, onOpenChange }: ItemDetailDialogP
                   )}
 
                   {/* AI Analysis */}
+                  {item.tags?.product_photo?.status === 'generated' && item.original_image_path && (
+                    <p className="text-sm text-muted-foreground">
+                      {t('view.productPhotoGenerated')}
+                    </p>
+                  )}
+                  {item.tags?.product_photo?.status === 'failed' && (
+                    <p className="text-sm text-muted-foreground">
+                      {t('view.productPhotoFailed')}
+                    </p>
+                  )}
                   {(hasAiTags || item.ai_description) && item.status === 'ready' && (
                     <div className="space-y-2 pt-2 border-t">
                       <div className="flex items-center gap-2 text-sm font-medium">

@@ -1796,7 +1796,9 @@ async def remove_item_background(
 
     try:
         image_service = ImageService()
-        result = await asyncio.to_thread(image_service.remove_background, item.image_path, bg_color)
+        result = await asyncio.to_thread(
+            image_service.remove_background, item.image_path, bg_color, item.original_image_path
+        )
         item.original_image_path = result["original_backup_path"]
         if recovering_from_error:
             item.status = ItemStatus.ready

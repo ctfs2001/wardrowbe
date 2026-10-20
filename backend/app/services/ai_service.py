@@ -10,7 +10,7 @@ from typing import Literal
 
 import httpx
 from PIL import Image, ImageOps
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ValidationError
 
 from app.config import get_settings
 from app.utils.garment_vocabulary import (
@@ -39,6 +39,12 @@ class TextGenerationResult(BaseModel):
     endpoint: str
 
 
+class ProductPhotoAssessment(BaseModel):
+    needs_redraw: bool
+    confidence: float = Field(ge=0, le=1)
+    reason: str = Field(max_length=500)
+
+
 class ClothingTags(BaseModel):
     type: str = "unknown"
     subtype: str | None = None
@@ -58,6 +64,7 @@ class ClothingTags(BaseModel):
     # didn't know" (type missing) stays distinguishable from "the model answered
     # something we don't support" (e.g. "culottes"), which otherwise both read "unknown".
     unrecognized_type: str | None = None
+    product_photo: ProductPhotoAssessment | None = None
 
     def has_content(self) -> bool:
         return bool(
@@ -454,6 +461,13 @@ class AIService:
         tags.style = validate_list(data.get("style", []), VALID_STYLES)
         tags.season = validate_list(data.get("season", []), VALID_SEASONS)
         tags.fit = validate_value(data.get("fit"), VALID_FIT)
+        if isinstance(data.get("product_photo"), dict):
+            try:
+                tags.product_photo = ProductPhotoAssessment.model_validate(
+                    data["product_photo"], strict=True
+                )
+            except ValidationError:
+                logger.warning("Ignoring invalid product-photo assessment")
         tags.confidence = compute_tag_completeness(tags)
 
         logger.info(
