@@ -442,6 +442,7 @@ async def suggest_outfit(
             exclude_items=request.exclude_items,
             include_items=request.include_items,
             time_of_day=request.time_of_day,
+            event_notes=request.event_notes,
         )
     except InsufficientWardrobeError as e:
         raise HTTPException(
@@ -808,6 +809,7 @@ async def accept_outfit(
     outfit.status = OutfitStatus.accepted
     outfit.responded_at = datetime.utcnow()
     await db.commit()
+    await _run_learning_safely(db, outfit.id, current_user.id)
     await db.refresh(outfit)
 
     return outfit_to_response(
@@ -843,6 +845,7 @@ async def reject_outfit(
     outfit.status = OutfitStatus.rejected
     outfit.responded_at = datetime.utcnow()
     await db.commit()
+    await _run_learning_safely(db, outfit.id, current_user.id)
     await db.refresh(outfit)
 
     await clear_suggestions(current_user.id, outfit.occasion)

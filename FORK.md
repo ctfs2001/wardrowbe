@@ -8,11 +8,12 @@
 |---|---|---|
 | 自動重繪商品照 | `product_photo_service.py`、`tagging.py`、`product_photo.txt`、單品詳情 | 首次辨識時判斷照片是否需要整理，以獨立圖片編輯服務重繪透明 PNG；保留原圖可還原，預設關閉，設定見 README |
 | 活動／場合備註 | `frontend/app/dashboard/suggest/page.tsx`、`frontend/messages/*/suggest.json`、`backend/app/api/outfits.py`（`event_notes`）、`recommendation_service.py` | 推薦頁可以填今天的活動、地點或 dress code，AI 會優先參考。填了備註的推薦不進快取，備註也會存到套裝上，之後在歷史紀錄看得到 |
-| 每套都有鞋 | `recommendation_service.py`（`_ensure_footwear`） | AI 沒挑鞋時，自動補上評分最高的鞋 |
-| 鞋子、配件可重複 | `recommendation_service.py`（`_repeat_ok`） | 「N 天內不重複」和「今天拒絕過的不再推」只套用在衣服上；鞋、帽、眼鏡、皮帶可以天天穿 |
+| 穿搭品質檢查 | `outfit_quality.py`、`recommendation_service.py` | 先驗證全身覆蓋、鞋子、指定單品、正式度與方案差異，再儲存；不合格最多請原 AI 修正一次，不任意補鞋讓說明與單品不符。詳見 [穿搭邏輯](docs/outfit-quality.md) |
+| 推薦輪替與回饋 | `item_scorer.py`、`learning_service.py` | 未記錄實穿也依最近七天推薦次數輪替上衣、褲子；拒絕整套不封鎖單品、不推論討厭所有顏色，接受／拒絕立即更新學習資料 |
+| 鞋子、配件可重複 | `recommendation_service.py`（`_repeat_ok`） | 實穿避重複不限制鞋、帽、眼鏡、皮帶；推薦曝光扣分也不限制鞋與配件，指定單品可重複 |
 | 候選品項上限 | `backend/app/services/item_scorer.py`（`TOP_N`） | 70 → 200，避免帽子、眼鏡、鞋子被擠出清單 |
 | AI 回覆解析失敗時記錄全文 | `recommendation_service.py`（`_parse_ai_response`） | 方便除錯 |
-| 提示詞 | `backend/app/prompts/recommendation.txt`、`item_pairing.txt` | 正式度一致、必配鞋和眼鏡、皮帶規則、繁體中文輸出 |
+| 提示詞 | `backend/app/prompts/recommendation.txt`、`item_pairing.txt` | 整套正式度協調、必配鞋、眼鏡依需求選用、皮帶規則、輪廓比例與繁體中文輸出 |
 | 個人風格 | 環境變數 `STYLE_NOTES`（`backend/app/config.py`） | 自由文字的穿衣風格描述，會加進推薦提示詞。內容不放在公開 repo，由主機設定 |
 | helper 附加服務 | `backend/addons/helper/` | 整理照片、讀品牌和材質、以圖搜圖查商品資訊，見該目錄的 README。放在 `backend/` 底下是為了一起打包進 backend 映像 |
 

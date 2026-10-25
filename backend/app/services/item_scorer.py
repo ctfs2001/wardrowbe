@@ -64,7 +64,7 @@ SEASON_ADJACENCY = {
 # Show the stylist AI up to this many wardrobe items, so hats, glasses and shoes are never
 # cut off the list (upstream default: 70).
 TOP_N = 200
-MIN_ITEMS_FOR_SCORING = 50
+MIN_ITEMS_FOR_SCORING = 50  # Legacy test/extension constant; all wardrobe sizes are now scored.
 
 SENSITIVITY_SHIFT = 5
 
@@ -105,6 +105,8 @@ class ScoredItem:
     preference_score: float = 1.0
     usage_score: float = 1.0
     pair_bonus: float = 0.0
+    exposure_score: float = 1.0
+    recent_suggestions: int = 0
 
 
 def _temp_band(temp: float, cold_threshold: float, hot_threshold: float) -> str:
@@ -142,6 +144,8 @@ def _temp_bucket_score(
             return 0.7
     elif band == "hot":
         if warm_tights:
+            return 0.05
+        if item_type in WARM_LAYER_TYPES and _is_heavy_layer(item_type, material, subtype):
             return 0.05
         if material in ("cotton", "linen", "silk") or "summer" in seasons:
             return 1.0
@@ -436,11 +440,8 @@ def score_items(
     good_pairs: dict[UUID, list[UUID]],
     recently_worn_dates: dict[UUID, date],
     mandatory_item_ids: set[UUID] | None = None,
+    recent_suggestions: dict[UUID, int] | None = None,
 ) -> list[ScoredItem]:
-    if len(items) < MIN_ITEMS_FOR_SCORING:
-        scored = [ScoredItem(item=item) for item in items]
-        return _sort_mandatory_first(scored, mandatory_item_ids)
-
     avoid_days = DEFAULT_AVOID_REPEAT_DAYS
     if preferences and preferences.avoid_repeat_days is not None:
         avoid_days = preferences.avoid_repeat_days
@@ -464,8 +465,23 @@ def score_items(
         rs = _recency_score(item, user_today, avoid_days, recently_worn_dates)
         ps = _preference_score(item, preferences, learned_prefs)
         us = _usage_score(item, median_wear) if use_underused else 1.0
+        exposures = (recent_suggestions or {}).get(item.id, 0)
+        # Suggestions count even when the user has never logged a wear. Keep this a
+        # bounded soft preference: weather/dress code still outweigh novelty.
+        strength = {"low": 0.12, "high": 0.5}.get(
+            preferences.variety_level if preferences else None, 0.3
+        )
+        core_role = ITEM_ROLE.get((item.type or "").lower()) in {
+            "base_top",
+            "bottom",
+            "full_body",
+            "suit",
+        }
+        es = max(0.35, 1 / (1 + strength * exposures)) if core_role else 1.0
+        if item.id in (mandatory_item_ids or set()):
+            es = 1.0
 
-        total = ws * fs * ss * rs * ps * us
+        total = ws * fs * ss * rs * ps * us * es
 
         scored.append(
             ScoredItem(
@@ -477,6 +493,8 @@ def score_items(
                 recency_score=rs,
                 preference_score=ps,
                 usage_score=us,
+                exposure_score=es,
+                recent_suggestions=exposures,
             )
         )
 

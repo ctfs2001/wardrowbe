@@ -13,7 +13,9 @@ def _load_zone(name: str | None) -> ZoneInfo | None:
         return None
     try:
         return ZoneInfo(name)
-    except (ZoneInfoNotFoundError, ValueError):
+    except (ZoneInfoNotFoundError, ValueError, IsADirectoryError):
+        # The packaged tzdata fallback can expose a region directory ("America")
+        # as IsADirectoryError instead of ZoneInfoNotFoundError.
         return None
 
 

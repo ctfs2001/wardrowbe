@@ -5,7 +5,7 @@ CONTEXT:
 - Time of day: {time_of_day}
 - Weather: {temperature}°C (feels like {feels_like}°C), {condition}, {precipitation_chance}% chance of rain
 {temp_range_text}
-- Items are pre-ranked by suitability. Higher-numbered items are less compatible — prefer items near the top of the list.
+- Items are ranked by suitability and recent suggestion exposure, not absolute outfit quality. Compare compatible pieces across the whole wardrobe; a lower number is not a reason to reuse it. Never sacrifice weather or dress code for novelty.
 {preferences_text}
 
 STYLING PRINCIPLES:
@@ -24,7 +24,7 @@ Texture and fabric:
 
 Proportion and silhouette:
 - Balance volume: if the top is relaxed or oversized, the bottom should be more fitted, and vice versa
-- Do not go oversized on both top and bottom simultaneously
+- Relaxed tops with wide trousers are valid when length, tuck and structure create a deliberate silhouette. Explain that balance instead of forbidding all volume-on-volume looks.
 - Consider the visual line: with separates, where the top breaks (waist vs hip) sets the silhouette; with a one-piece garment, its own waist placement and fit define the line
 - If user body measurements are provided, consider proportions: taller frames carry volume better, broader builds benefit from structured pieces, and item sizes should be compatible with the user's measurements
 
@@ -60,10 +60,9 @@ RULES:
   - Suit: ONE top + ONE suit (<<SUIT_TYPES>>) + ONE footwear; the suit replaces the bottom
 - OPTIONAL: legwear (<<LEGWEAR_TYPES>>) under a skirt, dress or shorts in cool or cold weather; leave it out when it is warm, and put only thermal legwear under trousers or a jumpsuit, only when it is very cold. Legwear does not replace the bottom, the one-piece garment or footwear
 - OPTIONAL: ONE bag if appropriate for the occasion
-- Eyewear is REQUIRED whenever the wardrobe has it: ONE pair of glasses/sunglasses (eyewear may be listed as "accessories" — check the item description)
+- Eyewear is optional unless requested. Sunglasses should match daylight and outdoor use.
 - Hat/cap is OPTIONAL: add one only when the outfit is casual or relaxed smart-casual AND the cap's color and fabric match. NEVER put a cap with dress shoes (oxfords, brogues, derbies), a suit, a blazer, or tailored trousers
 - SHOES ARE MANDATORY: every outfit MUST contain exactly ONE footwear item (shoes, sneakers, boots, sandals, loafers). An outfit without a footwear item number is INVALID. The same pair of shoes may be reused across the 3 outfits if the wardrobe has few shoes
-- Eyewear: an item listed as "glasses (accessories)" is a pair of glasses; include ONE in every outfit when available
 - OPTIONAL: other accessories (belt, scarf, jewelry) that genuinely complement the outfit. A belt only goes with trousers/jeans that have belt loops — never with elastic, drawstring or pull-on waists. Match belt leather color to the shoes
 - For cold or rainy weather, add outerwear (jacket/coat) if available
 - Every optional piece must earn its place — do not add extra items just to fill slots
@@ -74,4 +73,10 @@ RULES:
 Respond with valid JSON containing exactly 3 distinct outfit options. Each must be a complete look.
 {{"outfits": [{{"items": [item numbers], "headline": "Short catchy outfit title (max 5 words)", "highlights": ["One short sentence each — vary your reasoning across color, texture, proportion, occasion, weather, or time of day"], "styling_tip": "One specific, actionable styling detail — do not suggest rolling up sleeves every time, vary your advice"}}, ...]}}
 
-Each outfit MUST use different key pieces (different tops, bottoms, one-piece garments or suits; shoes, hats and glasses may repeat). Vary color palettes and energy levels. First outfit = strongest recommendation.
+Selected mandatory pieces may repeat. Otherwise, each outfit MUST use different key pieces (different tops, bottoms, one-piece garments or suits; shoes, hats and glasses may repeat). Vary color palettes and energy levels. First outfit = strongest recommendation.
+
+QUALITY CHECK BEFORE ANSWERING:
+- Choose top/bottom silhouette first, then compatible shoes, then only useful layers and accessories.
+- Explain one concrete color/material/proportion relationship using the selected garments, not generic praise. Do not invent fabric, fit or details absent from the item data.
+- A rejected outfit rejects that combination, not all of its individual garments. Reuse a garment with a different partner when appropriate.
+- Repeated top/bottom combinations do not become new outfits by swapping shoes or a bag. Prefer core items with fewer recent suggestions.
