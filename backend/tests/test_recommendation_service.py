@@ -563,7 +563,7 @@ class TestPromptPreRanking:
     def test_pre_ranking_hint_present(self):
         from app.services.recommendation_service import RECOMMENDATION_PROMPT
 
-        assert "pre-ranked" in RECOMMENDATION_PROMPT
+        assert "ranked by suitability and recent suggestion exposure" in RECOMMENDATION_PROMPT
 
 
 class TestIncludeItems:
@@ -821,7 +821,7 @@ class TestHotDayLegwear:
         unavailable=None,
         include=(),
     ):
-        kinds = ("tights", "skirt", "t-shirt", "sneakers")
+        kinds = ("tights", "skirt", "t-shirt", "sneakers", "dress", "shoes")
         items = [
             ClothingItem(
                 user_id=user.id,
@@ -858,7 +858,6 @@ class TestHotDayLegwear:
                 ),
             }
             cached = json.loads(json.dumps(cached))
-        rejected = {items[3].id} if unavailable == "rejected" else set()
         # A fresh prompt only lists items that are still available.
         fresh_number_map = {n: i for n, i in number_map.items() if not (unavailable and n == 4)}
         service = RecommendationService(db_session)
@@ -870,7 +869,6 @@ class TestHotDayLegwear:
             ) as pop,
             patch("app.services.recommendation_service.push_suggestions", AsyncMock()) as push,
             patch.object(service, "_format_items_for_prompt", return_value=("", fresh_number_map)),
-            patch.object(service, "_get_today_rejected_item_ids", AsyncMock(return_value=rejected)),
         ):
             outfits = await service.generate_recommendations(
                 user=user,
@@ -892,11 +890,10 @@ class TestHotDayLegwear:
     @pytest.mark.asyncio
     async def test_a_tights_only_option_is_skipped_not_fatal(self, db_session, test_user):
         items, outfits = await self._hot_day_outfits(
-            db_session, test_user, [[3, 2], [1], [2, 4], [3]], count=2
+            db_session, test_user, [[3, 2, 4], [1], [2, 4], [5, 6]], count=2
         )
-        # The first look gets the sneakers added: every outfit has shoes.
-        assert outfits == [{items[2].id, items[1].id, items[3].id}, {items[1].id, items[3].id}]
-        assert self.pushed == [[3]]
+        assert outfits == [{items[2].id, items[1].id, items[3].id}, {items[4].id, items[5].id}]
+        assert self.pushed == []
 
     @pytest.mark.asyncio
     async def test_a_tights_only_cached_suggestion_falls_through_to_a_fresh_one(
@@ -910,9 +907,9 @@ class TestHotDayLegwear:
     @pytest.mark.asyncio
     async def test_a_cached_suggestion_for_the_same_weather_is_served(self, db_session, test_user):
         items, outfits = await self._hot_day_outfits(
-            db_session, test_user, [[3, 2, 4]], cached={"items": [2, 4]}
+            db_session, test_user, [[3, 2, 4]], cached={"items": [3, 2, 4]}
         )
-        assert outfits == [{items[1].id, items[3].id}]
+        assert outfits == [{items[1].id, items[2].id, items[3].id}]
         self.ai.generate_text.assert_not_called()
         assert not {"_context", "_number_map"} & set(self.raw_responses[0])
 
@@ -924,20 +921,20 @@ class TestHotDayLegwear:
             db_session,
             test_user,
             [[3, 2, 4]],
-            cached={"items": [2, 4]},
+            cached={"items": [3, 2, 4]},
             cached_weather=_weather(temp=2),
         )
         assert outfits == [{items[1].id, items[2].id, items[3].id}]
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("unavailable", ["archived", "needs_wash", "rejected"])
+    @pytest.mark.parametrize("unavailable", ["archived", "needs_wash"])
     async def test_a_cached_suggestion_with_an_unavailable_item_is_not_served(
         self, db_session, test_user, unavailable
     ):
         items, outfits = await self._hot_day_outfits(
-            db_session, test_user, [[3, 2]], cached={"items": [2, 4]}, unavailable=unavailable
+            db_session, test_user, [[3, 2, 6]], cached={"items": [3, 2, 4]}, unavailable=unavailable
         )
-        assert outfits == [{items[1].id, items[2].id}]
+        assert outfits == [{items[1].id, items[2].id, items[5].id}]
         assert self.pop.await_count == 2
 
     @pytest.mark.asyncio
@@ -948,18 +945,18 @@ class TestHotDayLegwear:
             db_session,
             test_user,
             [[3, 2]],
-            cached={"items": [2, 4]},
+            cached={"items": [3, 2, 4]},
             unavailable="needs_wash",
             include=(4,),
         )
-        assert outfits == [{items[1].id, items[3].id}]
+        assert outfits == [{items[1].id, items[2].id, items[3].id}]
         self.ai.generate_text.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_cached_options_record_the_weather_they_were_made_for(
         self, db_session, test_user
     ):
-        await self._hot_day_outfits(db_session, test_user, [[3, 2, 4], [2, 4]])
+        await self._hot_day_outfits(db_session, test_user, [[3, 2, 4], [5, 6]])
         assert self.pushed_contexts == [
             suggestion_context(
                 _weather(temp=35), TimeOfDay.afternoon, None, test_user.body_measurements
@@ -974,4 +971,4 @@ class TestHotDayLegwear:
             db_session, test_user, [[1], [3, 2, 4], [2, 3]]
         )
         assert outfits == [{items[1].id, items[2].id, items[3].id}]
-        assert self.pushed == [[2, 3]]
+        assert self.pushed == []

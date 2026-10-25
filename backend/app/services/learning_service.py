@@ -216,7 +216,11 @@ class LearningService:
         )
         outfit = result.scalar_one_or_none()
 
-        if not outfit or not outfit.feedback:
+        if not outfit or outfit.user_id != user_id:
+            return
+        if not outfit.feedback:
+            # Accept/reject buttons record status without a feedback row.
+            await self._recompute_profile(user_id)
             return
 
         await self._update_outfit_performance(outfit)
@@ -509,20 +513,14 @@ class LearningService:
             # Determine signal from this outfit
             signal = self._get_outfit_signal(outfit)
 
-            # Extract features
-            for oi in outfit.items:
-                item = oi.item
-
-                # Color signals
-                color = canonical_primary_color(item.primary_color or "")
-                if color:
-                    color_scores.setdefault(color, []).append(signal)
-
-                # Style signals
-                for style in item.style or []:
-                    if style not in style_scores:
-                        style_scores[style] = []
-                    style_scores[style].append(signal)
+            # A rejected look is not evidence against every color/style in it.
+            # Count a feature once per look, with neutral evidence for rejected looks.
+            colors = {canonical_primary_color(oi.item.primary_color or "") for oi in outfit.items}
+            styles = {style for oi in outfit.items for style in (oi.item.style or [])}
+            for color in colors - {"", None}:
+                color_scores.setdefault(color, []).append(max(0.0, signal))
+            for style in styles:
+                style_scores.setdefault(style, []).append(max(0.0, signal))
 
             # Occasion patterns
             occasion = outfit.occasion
@@ -575,16 +573,20 @@ class LearningService:
                     style_count += 1
 
         # Compute final scores
-        # Lower threshold (1) to show data early; quality improves with more feedback
+        # Shrink toward neutral; only positive looks establish feature preferences.
         learned_color_scores = {}
         for color, signals in color_scores.items():
             if len(signals) >= 1:
-                learned_color_scores[color] = round(sum(signals) / len(signals), 3)
+                learned_color_scores[color] = round(
+                    sum(signals) / (sum(s > 0 for s in signals) + 1), 3
+                )
 
         learned_style_scores = {}
         for style, signals in style_scores.items():
             if len(signals) >= 1:
-                learned_style_scores[style] = round(sum(signals) / len(signals), 3)
+                learned_style_scores[style] = round(
+                    sum(signals) / (sum(s > 0 for s in signals) + 1), 3
+                )
 
         # Simplify occasion patterns
         learned_occasion_patterns = {}
@@ -632,6 +634,7 @@ class LearningService:
         profile.average_style_rating = (
             Decimal(str(round(avg_style, 2))) if avg_style is not None else None
         )
+        profile.model_version = "2.0"
         profile.feedback_count = len(outfits)
         profile.outfits_rated = rating_count
         profile.last_computed_at = datetime.now(UTC)

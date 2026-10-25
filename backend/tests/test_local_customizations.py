@@ -137,10 +137,11 @@ class TestRepeatAndRejectRules:
             for n, i in enumerate((shirt, pants, shoes, hat))
         )
         await db_session.commit()
-        rejected = await RecommendationService(db_session)._get_today_rejected_item_ids(
-            test_user, "casual"
-        )
-        assert rejected == {shirt.id, pants.id}
+        service = RecommendationService(db_session)
+        candidates = await service.get_candidate_items(test_user, _weather(), "casual", None, [])
+        assert {i.id for i in candidates} == {shirt.id, pants.id, shoes.id, hat.id}
+        counts = await service._get_recent_suggestion_counts(test_user)
+        assert counts == {i.id: 1 for i in (shirt, pants, shoes, hat)}
 
 
 class TestShoesGuaranteed:
@@ -238,5 +239,5 @@ class TestEventNotesSuggestions:
         outfits, prompt, pop, push = await self._generate(db_session, test_user, "   ")
         assert "EVENT DETAILS" not in prompt
         pop.assert_awaited()
-        push.assert_awaited()
+        push.assert_not_awaited()  # Incomplete/duplicate spare looks must not be cached.
         assert outfits[0].notes is None

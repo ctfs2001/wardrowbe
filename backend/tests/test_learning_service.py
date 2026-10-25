@@ -102,7 +102,7 @@ class TestProcessFeedbackProfile:
 
         profile = await _profile(db_session, user_id)
         assert profile.learned_occasion_patterns["work"]["preferred_colors"] == []
-        assert profile.learned_color_scores["navy"] < 0
+        assert profile.learned_color_scores["navy"] == 0
 
     @pytest.mark.asyncio
     async def test_feedback_replaces_a_junk_stored_profile(
@@ -493,7 +493,7 @@ class TestJunkLearnedProfileIsIgnored:
                 last_computed_at=datetime.now(UTC),
             )
         )
-        for item_type in ("shirt", "pants"):
+        for item_type in ("shirt", "pants", "sneakers"):
             db_session.add(
                 ClothingItem(
                     user_id=test_user.id,
@@ -505,7 +505,7 @@ class TestJunkLearnedProfileIsIgnored:
             )
         await db_session.commit()
         ai_reply = SimpleNamespace(
-            content='{"items": [1, 2], "headline": "x"}', model="m", endpoint="e"
+            content='{"items": [1, 2, 3], "headline": "x"}', model="m", endpoint="e"
         )
 
         with patch(
