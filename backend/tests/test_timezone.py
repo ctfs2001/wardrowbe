@@ -40,6 +40,10 @@ class TestIsValidTimezone:
     def test_unknown_or_malformed_zones_are_invalid(self, name):
         assert not is_valid_timezone(name)
 
+    def test_region_directory_from_packaged_tzdata_is_invalid(self):
+        with patch("app.utils.timezone.ZoneInfo", side_effect=IsADirectoryError("America")):
+            assert not is_valid_timezone("America")
+
 
 class TestResolveTimezone:
     def test_known_zone_is_returned(self):
