@@ -10,6 +10,14 @@
 
 如果私有檔不存在，仍可依本檔理解程式，但正式環境的即時狀態需要重新查證，不能把歷史部署資訊當作目前狀態。
 
+## 2026-10-26 待審核：每日配件
+
+- [PR #7](https://github.com/ctfs2001/wardrowbe/pull/7)，分支 `ai/daily-accessories`：每套推薦在可用庫存存在時各選一件眼鏡、帽子、包包，並保留恰一雙鞋的規則；四類可跨套／每日重複。
+- 眼鏡以 `accessories` 的眼鏡子類型識別，不把一般飾品當成眼鏡。未分類或誤標的眼鏡需先修正衣物標籤。
+- 候選上限保留這些配件類別；生成與快取都檢查缺件，最多一次 AI 修正，不事後補件；快取品質版本升至 3。
+- 本地品質與排序測試 116 項通過；完整資料庫流程由 PR CI 使用隔離 PostgreSQL／Redis 驗證。
+- 尚未合併、尚未部署；下列部署紀錄仍是前一版。
+
 ## 專案方向與已完成工作
 
 本專案是 `ctfs2001/wardrowbe`，上游為 `Anyesh/wardrowbe`。目前工作方向是改善既有衣櫃網站的推薦，不是另做本機技能或要求安裝 ChatGPT 外掛。沿用既有衣櫃、網站與 AI provider；沒有新增 AI provider、API key 或資料庫 migration。
@@ -30,7 +38,7 @@
 1. `backend/app/api/outfits.py`：`/outfits/suggest-options` 取三套；`/outfits/suggest` 取一套，兩者都傳遞活動備註。接受／拒絕會呼叫安全學習更新。
 2. `backend/app/services/recommendation_service.py`：讀取可用衣物，排除封存、待洗、明確排除等項目；處理指定單品、天氣、場合、風格、學習偏好與快取。
 3. `backend/app/services/item_scorer.py`：所有衣櫃規模都評分，候選上限 200。天氣、正式度、季節、實穿時間、偏好、使用量與推薦曝光相乘，再套用既有配對加分。
-4. `backend/app/prompts/recommendation.txt`：讓現有模型選出衣物編號，撰寫台灣繁體中文說明；提示詞允許有比例規劃的寬上衣加寬褲，眼鏡依需求選用。
+4. `backend/app/prompts/recommendation.txt`：讓現有模型選出衣物編號，撰寫台灣繁體中文說明；提示詞允許有比例規劃的寬上衣加寬褲，眼鏡、帽子與包包有可用庫存時每套各選一件。
 5. `backend/app/services/outfit_quality.py`：驗證模型選項，再由 recommendation service 寫入與快取；避免任意換鞋後仍沿用舊說明。
 6. `backend/app/services/learning_service.py`：整套回饋與配對統計；顏色／風格的正向特徵每套只算一次，證據少時向中性縮減。
 
@@ -44,12 +52,12 @@
 ### 品質檢查與快取
 
 - 驗證庫存編號、指定單品、上身／下身覆蓋、恰一件鞋類、身體槽位衝突、持續炎熱天氣的非指定腿部衣物，以及已知正式度相差至少三級的極端衝突。
-- 生成與快取回傳都做品質檢查；快取 context 的 `quality_version=2`。未送出的快取選項不算已推薦曝光，實際寫入的 Outfit 才會計入。
+- 生成與快取回傳都做品質檢查；快取 context 的 `quality_version=3`。未送出的快取選項不算已推薦曝光，實際寫入的 Outfit 才會計入。
 - `_materialize_outfit` 仍保留原有清理與補鞋 helper，不能因此以為其他呼叫路徑都已獲得相同的生成前品質檢查；新增路徑時需確認呼叫順序。
 
 ## 驗證結果與接續測試
 
-已部署來源的 GitHub CI：**2,115 項後端測試全部通過**；前端測試、前端建置、前後端 lint、Actionlint、Docker Build 皆通過。部署 PR 的 validate 也通過。
+已部署來源的 GitHub CI：**2,116 項後端測試全部通過**；前端測試、前端建置、前後端 lint、Actionlint、Docker Build 皆通過。部署 PR 的 validate 也通過。
 
 另外在獨立 NAS 測試容器中執行過完整後端測試：2,075 passed、27 skipped；不同環境的相依套件會影響收集／略過數量，不要把兩組數字相加。既有相依套件 deprecation 與測試 JWT 警告仍存在。
 

@@ -59,9 +59,9 @@ RULES:
   - One-piece: ONE full-body garment (<<FULL_BODY_TYPES>>) + ONE footwear (<<FOOTWEAR_TYPES>>)
   - Suit: ONE top + ONE suit (<<SUIT_TYPES>>) + ONE footwear; the suit replaces the bottom
 - OPTIONAL: legwear (<<LEGWEAR_TYPES>>) under a skirt, dress or shorts in cool or cold weather; leave it out when it is warm, and put only thermal legwear under trousers or a jumpsuit, only when it is very cold. Legwear does not replace the bottom, the one-piece garment or footwear
-- OPTIONAL: ONE bag if appropriate for the occasion
-- Eyewear is optional unless requested. Sunglasses should match daylight and outdoor use.
-- Hat/cap is OPTIONAL: add one only when the outfit is casual or relaxed smart-casual AND the cap's color and fabric match. NEVER put a cap with dress shoes (oxfords, brogues, derbies), a suit, a blazer, or tailored trousers
+- DAILY ACCESSORIES: the user wears eyewear, a hat and a bag every day. For EACH category present in the available wardrobe, every outfit MUST select exactly ONE suitable item. Omit a category only when no available inventory item belongs to it; never invent items or substitute jewelry for eyewear.
+- Choose eyewear from accessories whose subtype identifies glasses, eyeglasses, sunglasses, eyewear or spectacles (眼鏡／墨鏡). Prefer clear glasses indoors or at night; describe sunglasses as for outdoor daylight use.
+- Coordinate the hat and bag with the outfit's colors, material, proportions and occasion. Build a coherent look around the available daily accessories; do not omit the hat merely because trousers are tailored.
 - SHOES ARE MANDATORY: every outfit MUST contain exactly ONE footwear item (shoes, sneakers, boots, sandals, loafers). An outfit without a footwear item number is INVALID. The same pair of shoes may be reused across the 3 outfits if the wardrobe has few shoes
 - OPTIONAL: other accessories (belt, scarf, jewelry) that genuinely complement the outfit. A belt only goes with trousers/jeans that have belt loops — never with elastic, drawstring or pull-on waists. Match belt leather color to the shoes
 - For cold or rainy weather, add outerwear (jacket/coat) if available
@@ -73,7 +73,7 @@ RULES:
 Respond with valid JSON containing exactly 3 distinct outfit options. Each must be a complete look.
 {{"outfits": [{{"items": [item numbers], "headline": "Short catchy outfit title (max 5 words)", "highlights": ["One short sentence each — vary your reasoning across color, texture, proportion, occasion, weather, or time of day"], "styling_tip": "One specific, actionable styling detail — do not suggest rolling up sleeves every time, vary your advice"}}, ...]}}
 
-Selected mandatory pieces may repeat. Otherwise, each outfit MUST use different key pieces (different tops, bottoms, one-piece garments or suits; shoes, hats and glasses may repeat). Vary color palettes and energy levels. First outfit = strongest recommendation.
+Selected mandatory pieces may repeat. Otherwise, each outfit MUST use different key pieces (different tops, bottoms, one-piece garments or suits; shoes, hats, bags and glasses may repeat). Vary color palettes and energy levels. First outfit = strongest recommendation.
 
 QUALITY CHECK BEFORE ANSWERING:
 - Choose top/bottom silhouette first, then compatible shoes, then only useful layers and accessories.

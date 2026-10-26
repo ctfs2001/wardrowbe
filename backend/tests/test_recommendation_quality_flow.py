@@ -195,3 +195,48 @@ async def test_status_only_feedback_does_not_poison_feature_preferences(db_sessi
         assert profile.learned_color_scores == {"black": 0.15}
         assert profile.learned_style_scores == {"minimal": 0.15}
     assert profile.feedback_count == 2
+
+
+@pytest.mark.asyncio
+async def test_repairs_missing_daily_accessories_before_saving(db_session, test_user):
+    numbers = await setup_wardrobe(db_session, test_user)
+    for n, kind, subtype in [(8, "hat", None), (9, "bag", None), (10, "accessories", "glasses")]:
+        item = ClothingItem(
+            user_id=test_user.id,
+            type=kind,
+            subtype=subtype,
+            image_path=f"test/{uuid4()}.jpg",
+            status=ItemStatus.ready,
+            formality="casual",
+        )
+        db_session.add(item)
+        await db_session.flush()
+        numbers[n] = item.id
+    await db_session.commit()
+    service = RecommendationService(db_session)
+    with (
+        patch.object(service, "_format_items_for_prompt", return_value=("", numbers)),
+        patch(
+            "app.services.recommendation_service.AIService.generate_text",
+            AsyncMock(
+                side_effect=[
+                    reply([[1, 4, 7], [2, 5, 7], [3, 6, 7]]),
+                    reply([[1, 4, 7, 8, 9, 10], [2, 5, 7, 8, 9, 10], [3, 6, 7, 8, 9, 10]]),
+                ]
+            ),
+        ) as generate,
+    ):
+        outfits = await service.generate_recommendations(
+            test_user,
+            "casual",
+            weather_override=_weather(),
+            count=3,
+            event_notes="test",
+        )
+    assert generate.await_count == 2
+    assert len(outfits) == 3
+    for outfit in outfits:
+        assert {numbers[n] for n in [7, 8, 9, 10]} <= {oi.item_id for oi in outfit.items}
+        assert {oi.item_id for oi in outfit.items} == {
+            numbers[n] for n in outfit.ai_raw_response["items"]
+        }

@@ -7,6 +7,7 @@ from app.models.item import ClothingItem
 from app.models.preference import UserPreference
 from app.services.weather_service import WeatherData
 from app.utils.clothing import ITEM_ROLE
+from app.utils.daily_accessories import daily_accessory
 from app.utils.garment_vocabulary import FORMALITY, OCCASION_FORMALITY
 from app.utils.preference_defaults import DEFAULT_PREFER_UNDERUSED_ITEMS
 from app.utils.scales import (
@@ -70,7 +71,7 @@ SENSITIVITY_SHIFT = 5
 
 # An outfit is unwearable without these, so the prompt must keep candidates for them even
 # when a whole category scores below the TOP_N cut and would otherwise be sliced away.
-ESSENTIAL_ROLES = ("footwear", "bottom")
+ESSENTIAL_ROLES = ("footwear", "bottom", "hat", "bag", "eyewear")
 MIN_CANDIDATES_PER_ESSENTIAL_ROLE = 4
 
 TEMP_RANGE_MIN_SWING = 8.0
@@ -374,7 +375,7 @@ def _sort_mandatory_first(
 
 
 def _role_of(scored_item: ScoredItem) -> str | None:
-    return ITEM_ROLE.get((scored_item.item.type or "").lower())
+    return daily_accessory(scored_item.item) or ITEM_ROLE.get((scored_item.item.type or "").lower())
 
 
 def _ensure_role_diversity(
@@ -400,7 +401,14 @@ def _ensure_role_diversity(
         return scored
 
     promoted_ids = {s.item.id for s in promoted}
-    keep = [s for s in head if s.item.id in mandatory]
+    # Promoting a daily accessory must not evict the last footwear/bottom or
+    # another daily category already near the cutoff.
+    protected = {
+        s.item.id
+        for role in ESSENTIAL_ROLES
+        for s in [candidate for candidate in head if _role_of(candidate) == role][:min_per_role]
+    }
+    keep = [s for s in head if s.item.id in mandatory or s.item.id in protected]
     keep_ids = {s.item.id for s in keep}
     # head is already score-ordered, so taking the front of it drops the weakest entries.
     room = max(top_n - len(keep) - len(promoted), 0)
