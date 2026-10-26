@@ -2,10 +2,19 @@ from datetime import date
 from unittest.mock import AsyncMock, patch
 
 import pytest
+import pytest_asyncio
 
 from app.services.recommendation_service import RecommendationService
 from tests.test_item_scorer import _weather
 from tests.test_recommendation_quality_flow import reply, setup_wardrobe
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def planning_location(db_session, test_user):
+    test_user.location_lat = 25
+    test_user.location_lon = 121
+    test_user.timezone = "Asia/Taipei"
+    await db_session.commit()
 
 
 @pytest.mark.parametrize("endpoint", ["suggest", "suggest-options"])
@@ -78,3 +87,37 @@ async def test_weather_preview_resolves_tomorrow_and_selected_period(
     assert response.status_code == 200
     assert response.json()["target_date"] == "2026-10-27"
     assert forecast.call_args.args[2:4] == (date(2026, 10, 27), "evening")
+
+
+@pytest.mark.asyncio
+async def test_forecast_failure_stops_before_ai(client, auth_headers):
+    from app.services.weather_service import WeatherServiceError
+
+    with (
+        patch(
+            "app.services.weather_service.WeatherService.get_planned_weather",
+            AsyncMock(side_effect=WeatherServiceError("No hourly forecast")),
+        ),
+        patch(
+            "app.services.weather_service.WeatherService.get_current_weather", AsyncMock()
+        ) as current,
+        patch(
+            "app.services.recommendation_service.AIService.generate_text", AsyncMock()
+        ) as generate,
+    ):
+        preview = await client.get(
+            "/api/v1/weather/current?wear_day=tomorrow&time_of_day=morning", headers=auth_headers
+        )
+        result = await client.post(
+            "/api/v1/outfits/suggest-options",
+            json={
+                "occasion": "casual",
+                "wear_day": "tomorrow",
+                "time_of_day": "morning",
+            },
+            headers=auth_headers,
+        )
+    assert preview.status_code == 503
+    assert result.status_code == 400
+    generate.assert_not_awaited()
+    current.assert_not_awaited()
