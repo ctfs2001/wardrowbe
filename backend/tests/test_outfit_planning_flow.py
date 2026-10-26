@@ -55,7 +55,7 @@ async def test_planned_request_reaches_weather_prompt_and_saved_outfit(
     looks = response.json() if endpoint == "suggest-options" else [response.json()]
     for look in looks:
         assert look["scheduled_for"] == "2026-10-27"
-        assert look["time_of_day"] == "morning"
+        assert look["weather"]["time_of_day"] == "morning"
         assert look["weather"]["temperature"] == 18
         assert "長時間步行" in look["notes"]
         assert "冷氣房" in look["notes"]

@@ -720,6 +720,7 @@ class RecommendationService:
         mandatory_item_ids: set[UUID] | None = None,
         drop_legwear: bool = False,
         event_notes: str | None = None,
+        time_of_day: TimeOfDay | None = None,
     ) -> Outfit:
         selected_numbers = outfit_data.get("items", [])
         valid_ids = []
@@ -772,10 +773,14 @@ class RecommendationService:
         reasoning = outfit_data.get("headline") or outfit_data.get("reasoning")
         style_notes = outfit_data.get("styling_tip") or outfit_data.get("style_notes")
 
+        weather_snapshot = weather.to_dict()
+        if scheduled_date and time_of_day:
+            weather_snapshot["time_of_day"] = str(time_of_day)
+            weather_snapshot["timezone"] = str(get_user_timezone(user))
         outfit = Outfit(
             user_id=user.id,
             occasion=occasion,
-            weather_data=weather.to_dict(),
+            weather_data=weather_snapshot,
             scheduled_for=scheduled_date or get_user_today(user),
             reasoning=reasoning,
             style_notes=style_notes,
@@ -1005,6 +1010,7 @@ class RecommendationService:
                         source,
                         number_map,
                         scheduled_date=scheduled_date,
+                        time_of_day=time_of_day,
                         mandatory_item_ids=set(include_items) if include_items else None,
                         drop_legwear=drop_legwear,
                     )
@@ -1076,7 +1082,12 @@ class RecommendationService:
         # Filled after format() so the template keeps the same placeholders as upstream.
         prompt = prompt.replace("[[STYLE_NOTES]]", _style_notes_line())
         if scheduled_date:
-            prompt += f"\nWearing date: {scheduled_date.isoformat()} ({get_user_timezone(user)}). Weather describes the selected wearing window, not the request time."
+            prompt = prompt.replace(
+                "- Time of day:",
+                f"- Wearing date: {scheduled_date.isoformat()} ({get_user_timezone(user)}). "
+                "Weather describes the wearing window, not the request time.\n- Time of day:",
+                1,
+            )
         if event_notes:
             prompt = _add_event_notes(prompt, event_notes)
 
@@ -1177,6 +1188,7 @@ class RecommendationService:
                         source,
                         number_map,
                         scheduled_date=scheduled_date,
+                        time_of_day=time_of_day,
                         mandatory_item_ids=mandatory,
                         drop_legwear=drop_legwear,
                         event_notes=event_notes,

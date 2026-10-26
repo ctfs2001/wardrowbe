@@ -313,6 +313,8 @@ export interface WeatherData {
   temp_max?: number | null;
   window_min?: number | null;
   window_max?: number | null;
+  time_of_day?: WearPeriod | 'night';
+  timezone?: string | null;
 }
 
 // /weather/current serves the same snapshot outfits store, minus the wearing-window range.
