@@ -74,5 +74,17 @@
   "viewAll": "すべて見る",
   "wardrobePrivate": "あなたのワードローブは完全にプライベートです。共有・販売されることはありません",
   "you": "あなた",
-  "youreOffline": "オフラインです"
+  "youreOffline": "オフラインです",
+  "reaction": {
+    "accept": "採用",
+    "acceptHint": "今日着た＋好き",
+    "like": "好き",
+    "likeHint": "好みのみ記録",
+    "dislike": "好みではない",
+    "dislikeHint": "この組み合わせは合わない",
+    "neutralHint": "未選択なら好みは追加されません。好みの変更で着用記録は消えません。",
+    "futureHint": "未来のコーデは先に「好き」を選び、着用当日に採用してください。",
+    "wornOn": "着用記録：{date}",
+    "error": "保存できませんでした。再試行してください。"
+  }
 }

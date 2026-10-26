@@ -14,6 +14,7 @@ from app.models.outfit import (
     OutfitItem,
     OutfitSource,
     OutfitStatus,
+    UserFeedback,
 )
 from app.models.user import User
 
@@ -22,6 +23,7 @@ from app.models.user import User
 class OutfitListFilters:
     user_id: UUID
     status_filter: str | None = None
+    worn_only: bool | None = None
     occasion: str | None = None
     date_from: date | None = None
     date_to: date | None = None
@@ -88,6 +90,10 @@ class OutfitService:
                 clauses.append(Outfit.status == parsed_statuses[0])
             elif parsed_statuses:
                 clauses.append(Outfit.status.in_(parsed_statuses))
+
+        if filters.worn_only is not None:
+            worn = Outfit.feedback.has(UserFeedback.worn_at.is_not(None))
+            clauses.append(worn if filters.worn_only else ~worn)
 
         if filters.occasion:
             clauses.append(Outfit.occasion == filters.occasion)

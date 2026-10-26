@@ -75,6 +75,10 @@ Respond with valid JSON containing exactly 3 distinct outfit options. Each must 
 
 Selected mandatory pieces may repeat. Otherwise, each outfit MUST use different key pieces (different tops, bottoms, one-piece garments or suits; shoes, hats, bags and glasses may repeat). Vary color palettes and energy levels. First outfit = strongest recommendation.
 
+RECENT PREFERENCES:
+- Learned preferences are bounded, recent hints, not dress-code rules or permanent favorites. Weather, the selected activity and explicit user requirements come first.
+- When suitable inventory permits, let at least one option explore less-established colors or combinations while staying within the same quality requirements. Never sacrifice fit, weather suitability or the user's daily accessories just for novelty.
+
 QUALITY CHECK BEFORE ANSWERING:
 - Choose top/bottom silhouette first, then compatible shoes, then only useful layers and accessories.
 - Explain one concrete color/material/proportion relationship using the selected garments, not generic praise. Do not invent fabric, fit or details absent from the item data.

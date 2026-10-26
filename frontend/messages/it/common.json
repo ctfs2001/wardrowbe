@@ -74,5 +74,17 @@
   "viewAll": "Vedi tutto",
   "wardrobePrivate": "Il tuo guardaroba è privato: mai condiviso né venduto",
   "you": "Tu",
-  "youreOffline": "Sei offline"
+  "youreOffline": "Sei offline",
+  "reaction": {
+    "accept": "Accetta",
+    "acceptHint": "Indossato oggi + mi piace",
+    "like": "Mi piace",
+    "likeHint": "Solo preferenza",
+    "dislike": "Non mi piace",
+    "dislikeHint": "Non fa per me",
+    "neutralHint": "Nessuna scelta aggiunge preferenze. Cambiare opinione conserva la registrazione d’uso.",
+    "futureHint": "Per un outfit futuro scegli Mi piace; accettalo il giorno in cui lo indossi.",
+    "wornOn": "Indossato il: {date}",
+    "error": "Salvataggio non riuscito. Riprova."
+  }
 }

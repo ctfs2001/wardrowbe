@@ -12,7 +12,6 @@ from sqlalchemy.orm import selectinload
 
 from app.config import get_settings
 from app.models.item import ClothingItem, ItemStatus
-from app.models.learning import ItemPairScore, UserLearningProfile
 from app.models.outfit import (
     FamilyOutfitRating,
     Outfit,
@@ -34,6 +33,7 @@ from app.services.item_scorer import (
     temperature_band,
 )
 from app.services.outfit_quality import core_items, validate_option
+from app.services.recommendation_memory import recent_recommendation_memory
 from app.services.suggestion_cache import pop_suggestion, push_suggestions
 from app.services.weather_service import (
     GeocodingServiceError,
@@ -98,6 +98,8 @@ def suggestion_context(
 ) -> dict:
     return {
         "quality_version": 3,
+        "memory_version": 1,
+        "memory_day": datetime.now(UTC).date().isoformat(),
         "temps": [weather.temperature, weather.feels_like, *(scoring_temp_range(weather) or ())],
         "condition": weather.condition,
         "rain_likely": rain_likely(weather),
@@ -531,69 +533,12 @@ class RecommendationService:
         return ""
 
     async def _get_learned_preferences(self, user_id: UUID, occasion: str | None = None) -> dict:
-        result = await self.db.execute(
-            select(UserLearningProfile).where(UserLearningProfile.user_id == user_id)
-        )
-        profile = result.scalar_one_or_none()
-
-        if not profile or not profile.last_computed_at:
-            return {}
-
-        preferences = {}
-
-        if profile.color_scores:
-            liked_colors = sorted(
-                [(c, s) for c, s in profile.color_scores.items() if s > 0.2],
-                key=lambda x: x[1],
-                reverse=True,
-            )[:5]
-            if liked_colors:
-                preferences["learned_favorite_colors"] = [c for c, _ in liked_colors]
-            # Legacy negative color scores came from rejecting whole looks; they are
-            # not evidence that the user dislikes those colors. Explicit avoids remain.
-
-        if profile.style_scores:
-            liked_styles = sorted(
-                [(s, score) for s, score in profile.style_scores.items() if score > 0.2],
-                key=lambda x: x[1],
-                reverse=True,
-            )[:3]
-            if liked_styles:
-                preferences["learned_preferred_styles"] = [s for s, _ in liked_styles]
-
-        if occasion:
-            occ_data = profile.occasion_patterns.get(occasion)
-            if occ_data:
-                preferences["occasion_insights"] = {occasion: occ_data}
-
+        preferences, _ = await recent_recommendation_memory(self.db, user_id)
         return preferences
 
     async def _get_good_item_pairs(self, user_id: UUID) -> dict[UUID, list[UUID]]:
-        result = await self.db.execute(
-            select(ItemPairScore)
-            .where(
-                and_(
-                    ItemPairScore.user_id == user_id,
-                    ItemPairScore.compatibility_score > 0.3,
-                    ItemPairScore.times_paired >= 2,
-                )
-            )
-            .order_by(ItemPairScore.compatibility_score.desc())
-            .limit(50)
-        )
-        pairs = list(result.scalars().all())
-
-        good_pairs: dict[UUID, list[UUID]] = {}
-        for pair in pairs:
-            if pair.item1_id not in good_pairs:
-                good_pairs[pair.item1_id] = []
-            good_pairs[pair.item1_id].append(pair.item2_id)
-
-            if pair.item2_id not in good_pairs:
-                good_pairs[pair.item2_id] = []
-            good_pairs[pair.item2_id].append(pair.item1_id)
-
-        return good_pairs
+        _, pairs = await recent_recommendation_memory(self.db, user_id)
+        return pairs
 
     def _parse_ai_response(self, content: str) -> dict:
         def strip_comments(json_str: str) -> str:
@@ -1021,8 +966,7 @@ class RecommendationService:
 
         # Fetch scoring context
         recently_worn_dates = await self._get_recently_worn_dates(user)
-        good_pairs = await self._get_good_item_pairs(user.id)
-        learned_prefs = await self._get_learned_preferences(user.id, occasion=occasion)
+        learned_prefs, good_pairs = await recent_recommendation_memory(self.db, user.id)
         if learned_prefs:
             logger.info(
                 f"Using learned preferences for user {user.id}: {list(learned_prefs.keys())}"

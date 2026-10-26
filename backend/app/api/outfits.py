@@ -1,6 +1,6 @@
 import logging
 from datetime import date, datetime
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -183,7 +183,12 @@ class OutfitListResponse(BaseModel):
     has_more: bool
 
 
+class ReactionRequest(BaseModel):
+    action: Literal["wear", "like", "dislike"]
+
+
 class BulkOutfitFilters(BaseModel):
+    worn_only: bool | None = None
     status_filter: str | None = None
     occasion: str | None = None
     date_from: date | None = None
@@ -637,6 +642,7 @@ async def list_outfits(
     occasions: str | None = Query(
         None, max_length=500, description="Comma-separated occasion keys the search also matches"
     ),
+    worn_only: bool | None = Query(None, description="Filter actual wear records, not likes"),
     cloned_from_outfit_id: UUID | None = Query(
         None, description="Filter to wear instances of a specific template"
     ),
@@ -650,6 +656,7 @@ async def list_outfits(
     filters = OutfitListFilters(
         user_id=target_user_id,
         status_filter=status_filter,
+        worn_only=worn_only,
         occasion=occasion,
         date_from=date_from,
         date_to=date_to,
@@ -703,6 +710,7 @@ async def bulk_delete_outfits(
             date_from=request.filters.date_from if request.filters else None,
             date_to=request.filters.date_to if request.filters else None,
             source=request.filters.source if request.filters else None,
+            worn_only=request.filters.worn_only if request.filters else None,
             is_lookbook=request.filters.is_lookbook if request.filters else None,
             is_replacement=request.filters.is_replacement if request.filters else None,
             has_source_item=request.filters.has_source_item if request.filters else None,
@@ -787,6 +795,71 @@ async def get_outfit(
             detail={"message": "Outfit not found", "error_code": "OUTFIT_NOT_FOUND"},
         )
 
+    return outfit_to_response(
+        outfit, await fetch_wore_instead_items_map(db, [outfit], user_id=current_user.id)
+    )
+
+
+@router.post("/{outfit_id}/reaction", response_model=OutfitResponse)
+async def react_to_outfit(
+    outfit_id: UUID,
+    request: ReactionRequest,
+    db: DbSession,
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> OutfitResponse:
+    # Serialize rapid taps/retries with the legacy feedback route too. One wear
+    # event per outfit; changing a preference never deletes an actual wear.
+    query = (
+        select(Outfit)
+        .where(Outfit.id == outfit_id, Outfit.user_id == current_user.id)
+        .with_for_update()
+        .options(
+            selectinload(Outfit.feedback),
+            selectinload(Outfit.items).selectinload(OutfitItem.item),
+            selectinload(Outfit.family_ratings).selectinload(FamilyOutfitRating.user),
+        )
+        .execution_options(populate_existing=True)
+    )
+    outfit = (await db.execute(query)).scalar_one_or_none()
+    if not outfit:
+        raise HTTPException(status_code=404, detail="Outfit not found")
+    today = get_user_today(current_user)
+    if request.action == "wear" and (outfit.scheduled_for is None or outfit.scheduled_for > today):
+        raise HTTPException(
+            status_code=400,
+            detail="Like a future outfit now; record wearing it on the day you wear it.",
+        )
+    feedback = outfit.feedback
+    if feedback is None:
+        feedback = UserFeedback(outfit_id=outfit.id)
+        outfit.feedback = feedback
+        db.add(feedback)
+    positive = request.action != "dislike"
+    new_status = OutfitStatus.accepted if positive else OutfitStatus.rejected
+    changed = feedback.accepted != positive or outfit.status != new_status
+    feedback.accepted = positive
+    outfit.status = new_status
+    if request.action == "wear" and feedback.actually_worn is not True:
+        feedback.actually_worn = True
+        changed = True
+    if request.action == "wear" and feedback.worn_at is None:
+        feedback.worn_at = today
+        feedback.actually_worn = True
+        await ItemService(db).record_wears(
+            current_user.id,
+            [oi.item_id for oi in outfit.items],
+            today,
+            occasion=outfit.occasion,
+            outfit_id=outfit.id,
+        )
+        changed = True
+    if changed:
+        outfit.responded_at = datetime.utcnow()
+    await db.commit()
+    if changed:
+        await _run_learning_safely(db, outfit.id, current_user.id)
+        await clear_suggestions(current_user.id, outfit.occasion)
+    outfit = (await db.execute(query)).scalar_one()
     return outfit_to_response(
         outfit, await fetch_wore_instead_items_map(db, [outfit], user_id=current_user.id)
     )
@@ -911,6 +984,7 @@ async def submit_feedback(
     query = (
         select(Outfit)
         .where(and_(Outfit.id == outfit_id, Outfit.user_id == current_user.id))
+        .with_for_update()
         .options(
             selectinload(Outfit.feedback), selectinload(Outfit.items).selectinload(OutfitItem.item)
         )

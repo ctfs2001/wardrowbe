@@ -28,7 +28,7 @@
   "noOutfitsForDate": "{date}에 코디가 없어요",
   "outfitCount": "{count, plural, other {코디 #개}}",
   "status": {
-    "accepted": "수락됨",
+    "accepted": "좋아요",
     "expired": "만료됨",
     "pending": "대기 중",
     "rejected": "거절됨",

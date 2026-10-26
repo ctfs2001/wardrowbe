@@ -28,7 +28,7 @@
   "noOutfitsForDate": "No outfits for {date}",
   "outfitCount": "{count, plural, one {# outfit} other {# outfits}}",
   "status": {
-    "accepted": "Accepted",
+    "accepted": "Like",
     "expired": "Expired",
     "pending": "Pending",
     "rejected": "Rejected",

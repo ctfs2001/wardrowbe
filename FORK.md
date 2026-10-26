@@ -7,6 +7,7 @@
 | 功能 | 位置 | 說明 |
 |---|---|---|
 | 穿著日期／時段與快捷需求 | 建議頁、`weather_service.py`、`outfit_planning.py` | 今天／明天及上午／下午／晚上／全天改用對應逐時預報；六種快捷需求可複選，保留自由備註與手動天氣覆蓋 |
+| 喜好與實穿分開／近期學習 | `outfit-reaction-actions.tsx`、`outfits.py`、`recommendation_memory.py` | 接受＝今天實穿＋喜歡，另有喜歡／不喜歡；未選中性。推薦用最近 180 天最多 200 筆回饋、30 天半衰期，歷史不刪除 |
 | 自動重繪商品照 | `product_photo_service.py`、`tagging.py`、`product_photo.txt`、單品詳情 | 首次辨識時判斷照片是否需要整理，以獨立圖片編輯服務重繪透明 PNG；保留原圖可還原，預設關閉，設定見 README |
 | 活動／場合備註 | `frontend/app/dashboard/suggest/page.tsx`、`frontend/messages/*/suggest.json`、`backend/app/api/outfits.py`（`event_notes`）、`recommendation_service.py` | 推薦頁可以填今天的活動、地點或 dress code，AI 會優先參考。填了備註的推薦不進快取，備註也會存到套裝上，之後在歷史紀錄看得到 |
 | 穿搭品質檢查 | `outfit_quality.py`、`recommendation_service.py` | 先驗證全身覆蓋、鞋子、指定單品、正式度與方案差異，再儲存；不合格最多請原 AI 修正一次，不任意補鞋讓說明與單品不符。詳見 [穿搭邏輯](docs/outfit-quality.md) |

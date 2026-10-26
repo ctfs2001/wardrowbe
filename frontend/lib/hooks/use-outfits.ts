@@ -34,6 +34,7 @@ export interface OutfitListResponse {
 
 export interface OutfitFilters {
   status?: OutfitStatus;
+  worn_only?: boolean;
   occasion?: string;
   date_from?: string;
   date_to?: string;
@@ -82,6 +83,7 @@ function outfitListParams(filters: OutfitFilters, page: number, pageSize: number
   };
 
   if (filters.status) params.status = filters.status;
+  if (filters.worn_only !== undefined) params.worn_only = String(filters.worn_only);
   if (filters.occasion) params.occasion = filters.occasion;
   if (filters.date_from) params.date_from = filters.date_from;
   if (filters.date_to) params.date_to = filters.date_to;
@@ -150,6 +152,22 @@ export function useOutfit(outfitId: string | undefined) {
     queryKey: queryKeys.outfit(outfitId ?? ''),
     queryFn: () => api.get<Outfit>(`/outfits/${outfitId}`),
     enabled: !!outfitId && status !== 'loading',
+  });
+}
+
+export type OutfitReaction = 'wear' | 'like' | 'dislike';
+
+export function useOutfitReaction() {
+  const queryClient = useQueryClient();
+  useSetTokenIfAvailable();
+  return useMutation({
+    mutationFn: ({ outfitId, action }: { outfitId: string; action: OutfitReaction }) =>
+      api.post<Outfit>(`/outfits/${outfitId}/reaction`, { action }),
+    onSuccess: (_, { outfitId, action }) => {
+      invalidateOutfitCaches(queryClient, outfitId);
+      queryClient.invalidateQueries({ queryKey: queryKeys.learning.all });
+      if (action === 'wear') invalidateEveryItemWearCache(queryClient);
+    },
   });
 }
 

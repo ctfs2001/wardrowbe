@@ -74,5 +74,17 @@
   "viewAll": "查看全部",
   "wardrobePrivate": "你的衣橱是私密的，绝不会被分享或出售",
   "you": "你",
-  "youreOffline": "你已离线"
+  "youreOffline": "你已离线",
+  "reaction": {
+    "accept": "接受",
+    "acceptHint": "今天穿过＋喜欢",
+    "like": "喜欢",
+    "likeHint": "只记录喜好",
+    "dislike": "不喜欢",
+    "dislikeHint": "这套不合意",
+    "neutralHint": "未选不新增喜好；更改喜好不会删除实穿记录。",
+    "futureHint": "未来的穿搭可先按喜欢，实穿当天再接受。",
+    "wornOn": "已记录实穿：{date}",
+    "error": "保存失败，请重试。"
+  }
 }

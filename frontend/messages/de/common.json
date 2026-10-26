@@ -74,5 +74,17 @@
   "viewAll": "Alle anzeigen",
   "wardrobePrivate": "Dein Kleiderschrank ist privat — wird niemals geteilt oder verkauft",
   "you": "Du",
-  "youreOffline": "Du bist offline"
+  "youreOffline": "Du bist offline",
+  "reaction": {
+    "accept": "Annehmen",
+    "acceptHint": "Heute getragen + gefällt",
+    "like": "Gefällt mir",
+    "likeHint": "Nur Vorliebe",
+    "dislike": "Gefällt nicht",
+    "dislikeHint": "Nicht mein Stil",
+    "neutralHint": "Ohne Auswahl keine neue Vorliebe. Änderungen behalten den Trageeintrag.",
+    "futureHint": "Markiere ein zukünftiges Outfit als gefallen und nimm es am Tragetag an.",
+    "wornOn": "Getragen am: {date}",
+    "error": "Speichern fehlgeschlagen. Bitte erneut versuchen."
+  }
 }
