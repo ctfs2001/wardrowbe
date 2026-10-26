@@ -83,7 +83,9 @@ class TestStyleNotes:
 
 
 class TestRepeatOk:
-    @pytest.mark.parametrize("kind", ["sneakers", "shoes", "boots", "hat", "bag", "belt", "accessories"])
+    @pytest.mark.parametrize(
+        "kind", ["sneakers", "shoes", "boots", "hat", "bag", "belt", "accessories"]
+    )
     def test_shoes_and_accessories_may_repeat(self, kind):
         assert _repeat_ok(kind)
 
