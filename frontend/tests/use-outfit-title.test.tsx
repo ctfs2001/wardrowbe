@@ -27,6 +27,7 @@ const outfit = vi.hoisted(() => ({
 }))
 
 vi.mock('@/lib/hooks/use-outfits', () => ({
+  useOutfitReaction: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useOutfit: () => ({ data: outfit, isLoading: false }),
   useOutfits: () => ({ data: undefined }),
   useDeleteOutfit: () => ({ mutateAsync: vi.fn(), isPending: false }),

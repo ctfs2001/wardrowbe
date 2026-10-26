@@ -529,7 +529,14 @@ class TestJunkLearnedProfileIsIgnored:
             if generate_text.called
             else response.text
         )
-        assert "black" in seen
+        if generate_text.called:
+            # Recommendations now read recent explicit responses, not the lifetime
+            # aggregate. This fixture has no responses, so even its valid legacy
+            # favorite must not become a new recommendation preference.
+            assert "Learned favorite colors (from feedback)" not in seen
+            assert "Learned preferred styles:" not in seen
+        else:
+            assert "black" in seen
         assert junk_key not in seen
 
 

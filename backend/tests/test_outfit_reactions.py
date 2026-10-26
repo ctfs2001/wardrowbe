@@ -22,7 +22,12 @@ async def make_outfit(db, user, day=None):
     )
     db.add(outfit)
     await db.flush()
-    db.add_all([OutfitItem(outfit_id=outfit.id, item_id=numbers[n]) for n in (1, 4, 7)])
+    db.add_all(
+        [
+            OutfitItem(outfit_id=outfit.id, item_id=numbers[n], position=position)
+            for position, n in enumerate((1, 4, 7))
+        ]
+    )
     await db.commit()
     return outfit.id, [numbers[n] for n in (1, 4, 7)]
 
