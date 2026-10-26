@@ -131,3 +131,26 @@ def test_candidate_limit_preserves_daily_accessory_categories():
     )
     assert len(scored) == 200
     assert {numbers[n] for n in range(206, 211)} <= {s.item.id for s in scored}
+
+
+def test_promoting_accessories_does_not_evict_existing_essential_candidates():
+    from app.services.item_scorer import ScoredItem, _ensure_role_diversity
+
+    numbers, items = wardrobe(["shirt"] * 195 + ["pants", "sneakers", "hat", "bag", "accessories"])
+    items[numbers[200]].subtype = "glasses"
+    scored = [
+        ScoredItem(
+            item=item,
+            score=1,
+            weather_score=1,
+            formality_score=1,
+            season_score=1,
+            recency_score=1,
+            preference_score=1,
+            usage_score=1,
+            pair_bonus=0,
+        )
+        for item in items.values()
+    ]
+    result = _ensure_role_diversity(scored, top_n=198)[:198]
+    assert {numbers[n] for n in range(196, 201)} <= {s.item.id for s in result}

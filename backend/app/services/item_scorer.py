@@ -401,7 +401,14 @@ def _ensure_role_diversity(
         return scored
 
     promoted_ids = {s.item.id for s in promoted}
-    keep = [s for s in head if s.item.id in mandatory]
+    # Promoting a daily accessory must not evict the last footwear/bottom or
+    # another daily category already near the cutoff.
+    protected = {
+        s.item.id
+        for role in ESSENTIAL_ROLES
+        for s in [candidate for candidate in head if _role_of(candidate) == role][:min_per_role]
+    }
+    keep = [s for s in head if s.item.id in mandatory or s.item.id in protected]
     keep_ids = {s.item.id for s in keep}
     # head is already score-ordered, so taking the front of it drops the weakest entries.
     room = max(top_n - len(keep) - len(promoted), 0)

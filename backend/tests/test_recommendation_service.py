@@ -972,3 +972,10 @@ class TestHotDayLegwear:
         )
         assert outfits == [{items[1].id, items[2].id, items[3].id}]
         assert self.pushed == []
+
+
+def test_pre_daily_accessory_cache_is_not_reused():
+    current = _ctx()
+    older = {**current, "quality_version": 2}
+    assert current["quality_version"] == 3
+    assert cached_suggestion_fits(older, current, _FIT_PREFS) is False
