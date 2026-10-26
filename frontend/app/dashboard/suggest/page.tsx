@@ -378,7 +378,7 @@ function OutfitCard({
 
         {showActions && (
           <div className="pt-3 border-t mt-auto">
-            <OutfitReactionActions outfit={outfit} onUpdate={onUpdate} />
+            <OutfitReactionActions key={outfit.id} outfit={outfit} onUpdate={onUpdate} />
           </div>
         )}
       </CardContent>
