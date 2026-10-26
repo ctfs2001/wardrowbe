@@ -107,5 +107,29 @@
     "title": "Event notes (optional)",
     "subtitle": "Today's event, venue or dress code — the AI gives it priority",
     "placeholder": "e.g. Client pitch, blazer required; friend's wedding, semi-formal, avoid all white"
+  },
+  "planning": {
+    "day": "Quand allez-vous le porter ?",
+    "today": "Aujourd’hui",
+    "tomorrow": "Demain",
+    "period": "Moment de la journée",
+    "morning": "Matin",
+    "afternoon": "Après-midi",
+    "evening": "Soir",
+    "fullDay": "Toute la journée",
+    "hours": "Matin 06–12 h · Après-midi 12–18 h · Soir 18–24 h · Journée 06–24 h. Fuseau horaire du compte.",
+    "needs": "Besoins rapides (facultatif)",
+    "needsHint": "Plusieurs choix possibles. Ils guident la tenue sans modifier les prévisions.",
+    "indoorAc": "Intérieur climatisé",
+    "outdoors": "Surtout dehors",
+    "walking": "Beaucoup de marche",
+    "rainReady": "Résistant à la pluie",
+    "easyMove": "Liberté de mouvement",
+    "polished": "Un peu plus habillé",
+    "manualWeather": "La météo saisie manuellement est prioritaire sur les prévisions.",
+    "forecastError": "Prévisions indisponibles. Vérifiez votre lieu, réessayez ou saisissez la météo manuellement.",
+    "retry": "Réessayer",
+    "forecastFor": "Prévisions du {date} · {timezone}",
+    "temperatureRange": "Température sur la période : {min}–{max}"
   }
 }

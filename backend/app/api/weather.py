@@ -4,9 +4,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
+from app.models.outfit import TimeOfDay
 from app.models.user import User
 from app.services.weather_service import GeocodingServiceError, WeatherService, WeatherServiceError
 from app.utils.auth import get_current_user
+from app.utils.outfit_planning import WearDay, wearing_date
+from app.utils.timezone import get_user_timezone
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +32,8 @@ class WeatherResponse(BaseModel):
     timestamp: str = Field(description="Timestamp of weather data")
     temp_min: float | None = None
     temp_max: float | None = None
+    target_date: str | None = None
+    timezone: str | None = None
 
 
 class ForecastDayResponse(BaseModel):
@@ -57,6 +62,8 @@ async def get_current_weather(
     current_user: Annotated[User, Depends(get_current_user)],
     latitude: float | None = Query(None, ge=-90, le=90),
     longitude: float | None = Query(None, ge=-180, le=180),
+    wear_day: WearDay | None = None,
+    time_of_day: TimeOfDay = TimeOfDay.full_day,
 ) -> WeatherResponse:
     weather_service = WeatherService()
     lat = latitude if latitude is not None else current_user.location_lat
@@ -81,7 +88,14 @@ async def get_current_weather(
         )
 
     try:
-        weather = await weather_service.get_current_weather(float(lat), float(lon))
+        target_date = wearing_date(current_user, wear_day) if wear_day else None
+        timezone = str(get_user_timezone(current_user))
+        if target_date:
+            weather = await weather_service.get_planned_weather(
+                float(lat), float(lon), target_date, time_of_day, timezone
+            )
+        else:
+            weather = await weather_service.get_current_weather(float(lat), float(lon))
     except WeatherServiceError as e:
         logger.error(f"Weather service error: {e}")
         raise HTTPException(
@@ -103,6 +117,8 @@ async def get_current_weather(
         timestamp=weather.timestamp.isoformat(),
         temp_min=weather.temp_min,
         temp_max=weather.temp_max,
+        target_date=target_date.isoformat() if target_date else None,
+        timezone=timezone if target_date else None,
     )
 
 

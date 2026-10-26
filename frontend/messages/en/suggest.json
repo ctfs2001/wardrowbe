@@ -105,7 +105,31 @@
   "yourOutfit": "Your Outfit",
   "eventNotes": {
     "title": "Event notes (optional)",
-    "subtitle": "Today's event, venue or dress code — the AI gives it priority",
+    "subtitle": "The planned event, venue or dress code — the AI gives it priority",
     "placeholder": "e.g. Client pitch, blazer required; friend's wedding, semi-formal, avoid all white"
+  },
+  "planning": {
+    "day": "When will you wear it?",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "period": "Wearing time",
+    "morning": "Morning",
+    "afternoon": "Afternoon",
+    "evening": "Evening",
+    "fullDay": "Full day",
+    "hours": "Morning 06–12 · Afternoon 12–18 · Evening 18–24 · Full day 06–24. Uses your account time zone.",
+    "needs": "Quick needs (optional)",
+    "needsHint": "Select all that apply. These guide styling without changing the weather forecast.",
+    "indoorAc": "Air-conditioned indoors",
+    "outdoors": "Mostly outdoors",
+    "walking": "Lots of walking",
+    "rainReady": "Rain-friendly fabrics",
+    "easyMove": "Easy to move",
+    "polished": "A little dressier",
+    "manualWeather": "Manual weather is active and takes priority over the selected forecast.",
+    "forecastError": "Forecast unavailable. Check your saved location, retry, or set the weather manually.",
+    "retry": "Retry forecast",
+    "forecastFor": "Forecast for {date} · {timezone}",
+    "temperatureRange": "Wearing window: {min}–{max}"
   }
 }

@@ -105,7 +105,31 @@
   "yourOutfit": "你的穿搭",
   "eventNotes": {
     "title": "活動／場合備註（選填）",
-    "subtitle": "今天要出席的活動、地點或 dress code，AI 會優先參考",
+    "subtitle": "穿著當天的活動、地點或 dress code，AI 會優先參考",
     "placeholder": "例如：客戶簡報、需要穿西裝外套；朋友婚禮，dress code 半正式、避免全白"
+  },
+  "planning": {
+    "day": "哪一天穿？",
+    "today": "今天",
+    "tomorrow": "明天",
+    "period": "穿著時段",
+    "morning": "上午",
+    "afternoon": "下午",
+    "evening": "晚上",
+    "fullDay": "全天",
+    "hours": "上午 06–12 點・下午 12–18 點・晚上 18–24 點・全天 06–24 點，依帳號設定的時區。",
+    "needs": "快捷需求（選填）",
+    "needsHint": "可複選。用來調整搭配，不會改變天氣預報。",
+    "indoorAc": "室內冷氣",
+    "outdoors": "戶外為主",
+    "walking": "長時間走路",
+    "rainReady": "耐雨好整理",
+    "easyMove": "方便活動",
+    "polished": "稍微正式",
+    "manualWeather": "已啟用手動天氣，推薦會優先使用你填寫的天氣。",
+    "forecastError": "暫時無法取得預報。請確認位置設定、重試，或手動設定天氣。",
+    "retry": "重試預報",
+    "forecastFor": "{date} 的預報・{timezone}",
+    "temperatureRange": "穿著時段溫度：{min}–{max}"
   }
 }
