@@ -47,6 +47,7 @@ from app.services.studio_service import (
 from app.services.suggestion_cache import clear_suggestions
 from app.services.weather_service import WeatherData
 from app.utils.auth import get_current_user
+from app.utils.outfit_planning import ActivityNeed, WearDay, wearing_date
 from app.utils.rate_limit import rate_limit_by_user
 from app.utils.scales import RATING_MAX, RATING_MIN
 from app.utils.signed_urls import sign_optional
@@ -76,6 +77,8 @@ def _default_occasion(user: User) -> str:
 
 
 class SuggestRequest(BaseModel):
+    wear_day: WearDay | None = None
+    activity_needs: list[ActivityNeed] = Field(default_factory=list, max_length=6)
     occasion: Occasion | None = None
     time_of_day: TimeOfDay | None = None
     weather_override: WeatherOverrideRequest | None = None
@@ -441,7 +444,11 @@ async def suggest_outfit(
             weather_override=weather_override,
             exclude_items=request.exclude_items,
             include_items=request.include_items,
-            time_of_day=request.time_of_day,
+            time_of_day=request.time_of_day or (TimeOfDay.full_day if request.wear_day else None),
+            scheduled_date=wearing_date(current_user, request.wear_day)
+            if request.wear_day
+            else None,
+            activity_needs=request.activity_needs,
             event_notes=request.event_notes,
         )
     except InsufficientWardrobeError as e:
@@ -509,7 +516,11 @@ async def suggest_outfit_options(
             weather_override=weather_override,
             exclude_items=request.exclude_items,
             include_items=request.include_items,
-            time_of_day=request.time_of_day,
+            time_of_day=request.time_of_day or (TimeOfDay.full_day if request.wear_day else None),
+            scheduled_date=wearing_date(current_user, request.wear_day)
+            if request.wear_day
+            else None,
+            activity_needs=request.activity_needs,
             count=3,
             event_notes=request.event_notes,
         )

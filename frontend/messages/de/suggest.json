@@ -107,5 +107,29 @@
     "title": "Event notes (optional)",
     "subtitle": "Today's event, venue or dress code — the AI gives it priority",
     "placeholder": "e.g. Client pitch, blazer required; friend's wedding, semi-formal, avoid all white"
+  },
+  "planning": {
+    "day": "Wann möchtest du es tragen?",
+    "today": "Heute",
+    "tomorrow": "Morgen",
+    "period": "Tageszeit",
+    "morning": "Vormittag",
+    "afternoon": "Nachmittag",
+    "evening": "Abend",
+    "fullDay": "Ganzer Tag",
+    "hours": "Vormittag 06–12 · Nachmittag 12–18 · Abend 18–24 · Ganzer Tag 06–24. Es gilt die Zeitzone deines Kontos.",
+    "needs": "Schnellwahl (optional)",
+    "needsHint": "Mehrfachauswahl möglich. Beeinflusst das Styling, nicht die Wettervorhersage.",
+    "indoorAc": "Klimatisierte Innenräume",
+    "outdoors": "Meist draußen",
+    "walking": "Viel zu Fuß",
+    "rainReady": "Regenfeste, pflegeleichte Stoffe",
+    "easyMove": "Bewegungsfreiheit",
+    "polished": "Etwas eleganter",
+    "manualWeather": "Manuell eingestelltes Wetter hat Vorrang vor der Vorhersage.",
+    "forecastError": "Vorhersage nicht verfügbar. Prüfe deinen Standort, versuche es erneut oder stelle das Wetter manuell ein.",
+    "retry": "Erneut versuchen",
+    "forecastFor": "Vorhersage für {date} · {timezone}",
+    "temperatureRange": "Temperatur im Tragezeitraum: {min}–{max}"
   }
 }

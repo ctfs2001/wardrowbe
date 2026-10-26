@@ -107,5 +107,29 @@
     "title": "活动／场合备注（选填）",
     "subtitle": "今天要出席的活动、地点或 dress code，AI 会优先参考",
     "placeholder": "例如：客户汇报，需要穿西装外套；朋友婚礼，半正式，避免全白"
+  },
+  "planning": {
+    "day": "哪一天穿？",
+    "today": "今天",
+    "tomorrow": "明天",
+    "period": "穿着时段",
+    "morning": "上午",
+    "afternoon": "下午",
+    "evening": "晚上",
+    "fullDay": "全天",
+    "hours": "上午 06–12 点・下午 12–18 点・晚上 18–24 点・全天 06–24 点，按账户设置的时区。",
+    "needs": "快捷需求（选填）",
+    "needsHint": "可多选。用于调整搭配，不会改变天气预报。",
+    "indoorAc": "室内空调",
+    "outdoors": "户外为主",
+    "walking": "长时间走路",
+    "rainReady": "耐雨易打理",
+    "easyMove": "方便活动",
+    "polished": "稍微正式",
+    "manualWeather": "已启用手动天气，推荐会优先使用你填写的天气。",
+    "forecastError": "暂时无法获取预报。请确认位置设置、重试，或手动设置天气。",
+    "retry": "重试预报",
+    "forecastFor": "{date} 的预报・{timezone}",
+    "temperatureRange": "穿着时段温度：{min}–{max}"
   }
 }

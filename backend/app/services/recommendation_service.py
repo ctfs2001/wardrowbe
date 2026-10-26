@@ -43,12 +43,13 @@ from app.services.weather_service import (
 )
 from app.utils.clothing import canonical_item_order, deduplicate_by_body_slot, remove_legwear
 from app.utils.garment_vocabulary import ITEM_ROLE, render_outfit_prompt
+from app.utils.outfit_planning import ActivityNeed, activity_notes
 from app.utils.preference_defaults import (
     DEFAULT_LAYERING_PREFERENCE,
     DEFAULT_TEMPERATURE_SENSITIVITY,
 )
 from app.utils.prompts import load_prompt
-from app.utils.timezone import get_user_now, get_user_today
+from app.utils.timezone import get_user_now, get_user_timezone, get_user_today
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +113,7 @@ def suggestion_context(
 def cached_suggestion_fits(
     cached: dict | None, current: dict, preferences: UserPreference | None
 ) -> bool:
-    if not cached:
+    if not cached or cached.get("wearing_date") != current.get("wearing_date"):
         return False
     if any(
         key not in cached or cached[key] != value
@@ -719,6 +720,7 @@ class RecommendationService:
         mandatory_item_ids: set[UUID] | None = None,
         drop_legwear: bool = False,
         event_notes: str | None = None,
+        time_of_day: TimeOfDay | None = None,
     ) -> Outfit:
         selected_numbers = outfit_data.get("items", [])
         valid_ids = []
@@ -771,10 +773,14 @@ class RecommendationService:
         reasoning = outfit_data.get("headline") or outfit_data.get("reasoning")
         style_notes = outfit_data.get("styling_tip") or outfit_data.get("style_notes")
 
+        weather_snapshot = weather.to_dict()
+        if scheduled_date and time_of_day:
+            weather_snapshot["time_of_day"] = str(time_of_day)
+            weather_snapshot["timezone"] = str(get_user_timezone(user))
         outfit = Outfit(
             user_id=user.id,
             occasion=occasion,
-            weather_data=weather.to_dict(),
+            weather_data=weather_snapshot,
             scheduled_for=scheduled_date or get_user_today(user),
             reasoning=reasoning,
             style_notes=style_notes,
@@ -834,6 +840,7 @@ class RecommendationService:
         single_outfit: bool = False,
         scheduled_date: date | None = None,
         event_notes: str | None = None,
+        activity_needs: list[ActivityNeed] | None = None,
     ) -> list[Outfit]:
         # Guard first so deferral is unconditional, before any location/weather work.
         require_internal_ai("text")
@@ -846,6 +853,8 @@ class RecommendationService:
 
         # Determine cache eligibility before auto-merge
         event_notes = (event_notes or "").strip()[:EVENT_NOTES_MAX] or None
+        if activity_needs:
+            event_notes = "\n".join(filter(None, [activity_notes(activity_needs), event_notes]))
         # Looks made for a specific event must not be cached and reused for a normal request.
         use_cache = not exclude_items and not single_outfit and not event_notes
 
@@ -871,7 +880,12 @@ class RecommendationService:
             if lat is None or lon is None:
                 raise ValueError("User location not set. Please set location in settings.")
             try:
-                weather = await self.weather_service.get_current_weather(lat, lon)
+                if scheduled_date:
+                    weather = await self.weather_service.get_planned_weather(
+                        lat, lon, scheduled_date, time_of_day, str(get_user_timezone(user))
+                    )
+                else:
+                    weather = await self.weather_service.get_current_weather(lat, lon)
             except WeatherServiceError as e:
                 logger.error(f"Weather service failed: {e}")
                 raise ValueError(
@@ -883,6 +897,9 @@ class RecommendationService:
         context = suggestion_context(
             weather, time_of_day, preferences, getattr(user, "body_measurements", None)
         )
+
+        if scheduled_date:
+            context["wearing_date"] = scheduled_date.isoformat()
 
         ai_endpoints = None
         if preferences and preferences.ai_endpoints:
@@ -993,6 +1010,7 @@ class RecommendationService:
                         source,
                         number_map,
                         scheduled_date=scheduled_date,
+                        time_of_day=time_of_day,
                         mandatory_item_ids=set(include_items) if include_items else None,
                         drop_legwear=drop_legwear,
                     )
@@ -1015,7 +1033,7 @@ class RecommendationService:
         # Score items (replaces old filter approach)
         user_today = get_user_today(user)
         lat = float(user.location_lat) if user.location_lat is not None else None
-        current_season = get_season(user_today.month, lat)
+        current_season = get_season((scheduled_date or user_today).month, lat)
         scored = score_items(
             items=candidates,
             weather=weather,
@@ -1063,6 +1081,13 @@ class RecommendationService:
         )
         # Filled after format() so the template keeps the same placeholders as upstream.
         prompt = prompt.replace("[[STYLE_NOTES]]", _style_notes_line())
+        if scheduled_date:
+            prompt = prompt.replace(
+                "- Time of day:",
+                f"- Wearing date: {scheduled_date.isoformat()} ({get_user_timezone(user)}). "
+                "Weather describes the wearing window, not the request time.\n- Time of day:",
+                1,
+            )
         if event_notes:
             prompt = _add_event_notes(prompt, event_notes)
 
@@ -1163,6 +1188,7 @@ class RecommendationService:
                         source,
                         number_map,
                         scheduled_date=scheduled_date,
+                        time_of_day=time_of_day,
                         mandatory_item_ids=mandatory,
                         drop_legwear=drop_legwear,
                         event_notes=event_notes,
@@ -1203,6 +1229,7 @@ class RecommendationService:
         single_outfit: bool = False,
         scheduled_date: date | None = None,
         event_notes: str | None = None,
+        activity_needs: list[ActivityNeed] | None = None,
     ) -> Outfit:
         outfits = await self.generate_recommendations(
             user=user,
@@ -1216,6 +1243,7 @@ class RecommendationService:
             single_outfit=single_outfit,
             scheduled_date=scheduled_date,
             event_notes=event_notes,
+            activity_needs=activity_needs,
         )
         return outfits[0]
 

@@ -51,12 +51,13 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { ItemPicker } from '@/components/shared/item-picker';
+import { OutfitPlanning } from '@/components/outfit-planning';
 import { OccasionChips } from '@/components/shared/occasion-chips';
 import { useOccasionLabel, useWeatherConditionLabel, useTypeLabel } from '@/lib/hooks/use-translated-constants';
 import { useItem } from '@/lib/hooks/use-items';
 import { api, ApiError } from '@/lib/api';
 import { applySessionToken } from '@/lib/hooks/use-session-token';
-import { ClothingTypeValue, CurrentWeather, Item, Outfit, SuggestRequest } from '@/lib/types';
+import { ActivityNeed, WearDay, WearPeriod, ClothingTypeValue, CurrentWeather, Item, Outfit, SuggestRequest } from '@/lib/types';
 import { useWeather } from '@/lib/hooks/use-weather';
 import { usePreferences } from '@/lib/hooks/use-preferences';
 import { cn, formatShortDate } from '@/lib/utils';
@@ -148,6 +149,9 @@ function WeatherCard({ weather, isLoading, temperatureUnit, t }: { weather?: Cur
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-6">
+        {weather.temp_min != null && weather.temp_max != null && (
+          <p className="text-sm text-muted-foreground mb-3">{t('planning.temperatureRange', { min: formatTemp(weather.temp_min, temperatureUnit), max: formatTemp(weather.temp_max, temperatureUnit) })}</p>
+        )}
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-4">
             <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center text-foreground">
@@ -591,7 +595,10 @@ function SuggestContent() {
   const preselectedItemId = searchParams.get('item');
   const { data: preselectedItem } = useItem(preselectedItemId || '');
   const { data: session } = useSession();
-  const { data: weather, isLoading: weatherLoading } = useWeather();
+  const [wearDay, setWearDay] = useState<WearDay>('today');
+  const [wearPeriod, setWearPeriod] = useState<WearPeriod>('full day');
+  const [activityNeeds, setActivityNeeds] = useState<ActivityNeed[]>([]);
+  const { data: weather, isFetching: weatherLoading, isError: weatherError, refetch: refetchWeather } = useWeather(wearDay, wearPeriod);
   const { data: prefs } = usePreferences();
   const temperatureUnit: TempUnit = prefs?.temperature_unit === 'fahrenheit' ? 'fahrenheit' : 'celsius';
   const [selectedOccasion, setSelectedOccasion] = useState<string | null>(null);
@@ -631,6 +638,9 @@ function SuggestContent() {
     try {
       const request: SuggestRequest = {
         occasion: selectedOccasion,
+        wear_day: wearDay,
+        time_of_day: wearPeriod,
+        activity_needs: activityNeeds,
         include_items: selectedItem ? [selectedItem.id] : [],
       };
 
@@ -744,8 +754,26 @@ function SuggestContent() {
 
       {outfits.length === 0 ? (
         <div className="space-y-6">
-          {/* Weather context */}
-          <WeatherCard weather={weather} isLoading={weatherLoading} temperatureUnit={temperatureUnit} t={t} />
+          <Card>
+            <CardContent className="p-6">
+              <OutfitPlanning day={wearDay} period={wearPeriod} needs={activityNeeds}
+                onDayChange={setWearDay} onPeriodChange={setWearPeriod} onNeedsChange={setActivityNeeds}
+                disabled={isGenerating} />
+            </CardContent>
+          </Card>
+          {weatherOverride ? (
+            <Alert><AlertDescription>{t('planning.manualWeather')}</AlertDescription></Alert>
+          ) : weatherError ? (
+            <Alert variant="destructive">
+              <AlertDescription>{t('planning.forecastError')}</AlertDescription>
+              <Button type="button" variant="outline" className="mt-2" onClick={() => refetchWeather()}>{t('planning.retry')}</Button>
+            </Alert>
+          ) : (
+            <div className="space-y-2" aria-live="polite">
+              {weather?.target_date && !weatherLoading && <p className="text-sm text-muted-foreground">{t('planning.forecastFor', { date: weather.target_date, timezone: weather.timezone || '' })}</p>}
+              <WeatherCard weather={weather} isLoading={weatherLoading} temperatureUnit={temperatureUnit} t={t} />
+            </div>
+          )}
 
           {/* Main selection card */}
           <Card>
@@ -886,7 +914,7 @@ function SuggestContent() {
                   size="lg"
                   className="w-full gap-2"
                   onClick={handleGenerate}
-                  disabled={!selectedOccasion || isGenerating}
+                  disabled={!selectedOccasion || isGenerating || (!weatherOverride && (weatherLoading || weatherError || !weather))}
                 >
                   {isGenerating ? (
                     <>

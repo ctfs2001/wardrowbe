@@ -107,5 +107,29 @@
     "title": "Event notes (optional)",
     "subtitle": "Today's event, venue or dress code — the AI gives it priority",
     "placeholder": "e.g. Client pitch, blazer required; friend's wedding, semi-formal, avoid all white"
+  },
+  "planning": {
+    "day": "いつ着ますか？",
+    "today": "今日",
+    "tomorrow": "明日",
+    "period": "着用する時間帯",
+    "morning": "午前",
+    "afternoon": "午後",
+    "evening": "夜",
+    "fullDay": "終日",
+    "hours": "午前 06–12時・午後 12–18時・夜 18–24時・終日 06–24時。アカウントのタイムゾーンを使用します。",
+    "needs": "簡単な要望（任意）",
+    "needsHint": "複数選択できます。コーディネートに反映されますが、天気予報は変更しません。",
+    "indoorAc": "冷房のある室内",
+    "outdoors": "主に屋外",
+    "walking": "長時間歩く",
+    "rainReady": "雨に強く手入れが簡単",
+    "easyMove": "動きやすさ",
+    "polished": "少しフォーマル",
+    "manualWeather": "手動の天気設定を優先して提案します。",
+    "forecastError": "予報を取得できません。場所の設定を確認して再試行するか、天気を手動で設定してください。",
+    "retry": "予報を再取得",
+    "forecastFor": "{date} の予報・{timezone}",
+    "temperatureRange": "着用時間帯の気温：{min}–{max}"
   }
 }

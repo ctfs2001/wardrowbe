@@ -1,12 +1,15 @@
 import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
+from math import isfinite
+from zoneinfo import ZoneInfo
 
 import httpx
 import redis.asyncio as aioredis
 
 from app.config import get_settings
+from app.models.outfit import TimeOfDay
 from app.utils.redis_lock import get_redis
 
 logger = logging.getLogger(__name__)
@@ -444,11 +447,11 @@ class WeatherService:
         uv_indexes = daily.get("uv_index_max", [])
 
         forecasts = []
-        for i, date in enumerate(dates):
+        for i, forecast_date in enumerate(dates):
             code = weather_codes[i] if i < len(weather_codes) else 0
             forecasts.append(
                 DailyForecast(
-                    date=date,
+                    date=forecast_date,
                     temp_max=temp_maxs[i] if i < len(temp_maxs) else 0,
                     temp_min=temp_mins[i] if i < len(temp_mins) else 0,
                     precipitation_chance=precip_probs[i] if i < len(precip_probs) else 0,
@@ -461,6 +464,101 @@ class WeatherService:
             )
 
         return forecasts
+
+    async def get_planned_weather(
+        self,
+        latitude: float,
+        longitude: float,
+        target_date: date,
+        time_of_day: TimeOfDay,
+        timezone: str,
+    ) -> WeatherData:
+        """Summarize only the selected local wearing window; never fall back to now.
+
+        Open-Meteo hourly fields and local start/end dates:
+        https://open-meteo.com/en/docs
+        """
+        self._validate_coordinates(latitude, longitude)
+        start, end = {
+            TimeOfDay.morning: (6, 12),
+            TimeOfDay.afternoon: (12, 18),
+            TimeOfDay.evening: (18, 24),
+            TimeOfDay.night: (18, 24),
+            TimeOfDay.full_day: (6, 24),
+        }[time_of_day]
+        fields = [
+            "temperature_2m",
+            "apparent_temperature",
+            "relative_humidity_2m",
+            "precipitation_probability",
+            "precipitation",
+            "weather_code",
+            "wind_speed_10m",
+            "is_day",
+            "uv_index",
+        ]
+        params = {
+            "latitude": latitude,
+            "longitude": longitude,
+            "timezone": timezone,
+            "start_date": target_date.isoformat(),
+            "end_date": target_date.isoformat(),
+            "hourly": fields,
+        }
+        try:
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+                response = await client.get(f"{self.base_url}/forecast", params=params)
+                response.raise_for_status()
+                hourly = response.json()["hourly"]
+            rows = []
+            for i, raw_time in enumerate(hourly["time"]):
+                local = datetime.fromisoformat(raw_time)
+                if local.date() != target_date or not start <= local.hour < end:
+                    continue
+                values = {field: hourly[field][i] for field in fields}
+                if not all(isinstance(v, (int, float)) and isfinite(v) for v in values.values()):
+                    continue
+                rows.append((local, values))
+            # Missing hours must not hide a cold/rainy part of the selected window.
+            if {local.hour for local, _ in rows} != set(range(start, end)):
+                raise ValueError("Incomplete hourly forecast for selected wearing window")
+        except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError) as exc:
+            raise WeatherServiceError("Selected wearing forecast is unavailable") from exc
+
+        def mean(field: str) -> float:
+            return round(sum(values[field] for _, values in rows) / len(rows), 1)
+
+        def peak(field: str) -> float:
+            return max(values[field] for _, values in rows)
+
+        temps = [v["temperature_2m"] for _, v in rows]
+        # Wettest hour represents conditions, rather than hiding a shower in an average.
+        representative = max(
+            rows,
+            key=lambda row: (
+                row[1]["precipitation_probability"],
+                row[1]["precipitation"],
+                row[1]["weather_code"],
+            ),
+        )[1]
+        code = int(representative["weather_code"])
+        return WeatherData(
+            temperature=mean("temperature_2m"),
+            feels_like=mean("apparent_temperature"),
+            humidity=round(mean("relative_humidity_2m")),
+            precipitation_chance=round(peak("precipitation_probability")),
+            precipitation_mm=peak("precipitation"),
+            wind_speed=peak("wind_speed_10m"),
+            condition=self._interpret_weather_code(code),
+            condition_code=code,
+            is_day=mean("is_day") >= 0.5,
+            uv_index=peak("uv_index"),
+            timestamp=rows[0][0].replace(tzinfo=ZoneInfo(timezone)),
+            temp_min=min(temps),
+            temp_max=max(temps),
+            window_min=min(temps),
+            window_max=max(temps),
+        )
 
     async def get_tomorrow_weather(self, latitude: float, longitude: float) -> WeatherData:
         """

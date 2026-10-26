@@ -107,5 +107,29 @@
     "title": "Event notes (optional)",
     "subtitle": "Today's event, venue or dress code — the AI gives it priority",
     "placeholder": "e.g. Client pitch, blazer required; friend's wedding, semi-formal, avoid all white"
+  },
+  "planning": {
+    "day": "언제 입으실 건가요?",
+    "today": "오늘",
+    "tomorrow": "내일",
+    "period": "착용 시간대",
+    "morning": "오전",
+    "afternoon": "오후",
+    "evening": "저녁",
+    "fullDay": "하루 종일",
+    "hours": "오전 06–12시 · 오후 12–18시 · 저녁 18–24시 · 하루 종일 06–24시. 계정 시간대를 사용합니다.",
+    "needs": "빠른 요구사항 (선택)",
+    "needsHint": "여러 개를 선택할 수 있습니다. 코디에 반영되며 일기예보는 변경되지 않습니다.",
+    "indoorAc": "냉방 실내",
+    "outdoors": "주로 야외",
+    "walking": "오래 걷기",
+    "rainReady": "비에 강하고 관리하기 쉬움",
+    "easyMove": "편한 활동",
+    "polished": "조금 더 격식 있게",
+    "manualWeather": "직접 입력한 날씨를 예보보다 우선 사용합니다.",
+    "forecastError": "예보를 불러올 수 없습니다. 위치 설정을 확인하고 다시 시도하거나 날씨를 직접 입력하세요.",
+    "retry": "예보 다시 시도",
+    "forecastFor": "{date} 예보 · {timezone}",
+    "temperatureRange": "착용 시간대 기온: {min}–{max}"
   }
 }

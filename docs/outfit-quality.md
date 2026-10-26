@@ -5,6 +5,23 @@ an occasion, optionally pin a garment and add event details, then generate outfi
 Pinned garments may repeat; other core pieces should vary when suitable alternatives
 exist. Accept/reject buttons now refresh the learning profile immediately.
 
+## Planning the wearing time
+
+The suggestion page offers today/tomorrow and morning (06–12), afternoon (12–18),
+evening (18–24), or full day (06–24), in the account time zone. Both the preview
+and generation use the same selected hourly forecast window from the existing
+[Open-Meteo API](https://open-meteo.com/en/docs). Average temperature/apparent
+temperature, the selected temperature range, maximum rain probability and maximum
+wind guide the recommendation. Missing forecast hours produce an error, never a
+silent fallback to current weather. A manual weather override takes priority.
+
+Optional quick needs cover air-conditioned interiors, outdoor use, walking,
+rain-friendly materials, movement and a more polished look. They guide styling,
+not the measured weather, and are saved alongside free-text event notes. The
+outfit uses the selected wearing date and period; cache contexts isolate dates
+and periods. Requests without a wearing day retain legacy current-weather behavior.
+No database migration is needed. This planning change awaits review and deployment.
+
 ## Changes
 
 - Rank every wardrobe size. Count recommendations in the last seven days separately

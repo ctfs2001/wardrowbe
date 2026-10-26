@@ -313,10 +313,12 @@ export interface WeatherData {
   temp_max?: number | null;
   window_min?: number | null;
   window_max?: number | null;
+  time_of_day?: WearPeriod | 'night';
+  timezone?: string | null;
 }
 
 // /weather/current serves the same snapshot outfits store, minus the wearing-window range.
-export type CurrentWeather = Omit<WeatherData, 'window_min' | 'window_max'>;
+export type CurrentWeather = Omit<WeatherData, 'window_min' | 'window_max'> & { target_date?: string | null; timezone?: string | null };
 
 export interface WoreInsteadItem {
   id: string;
@@ -374,7 +376,14 @@ export interface Outfit {
   created_at: string;
 }
 
+export type WearDay = 'today' | 'tomorrow';
+export type WearPeriod = 'morning' | 'afternoon' | 'evening' | 'full day';
+export type ActivityNeed = 'indoor_ac' | 'outdoors' | 'walking' | 'rain_ready' | 'easy_move' | 'polished';
+
 export interface SuggestRequest {
+  wear_day?: WearDay;
+  time_of_day?: WearPeriod;
+  activity_needs?: ActivityNeed[];
   occasion: string;
   weather_override?: {
     temperature: number;
