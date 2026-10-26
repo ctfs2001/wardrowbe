@@ -89,6 +89,8 @@ git log -5 --oneline origin/main
 
 不要預設目前 checkout 就是最新 main。確認並保留既有工作後，新的程式任務從最新 main 開 `ai/<description>` 分支，依環境規則提交 PR。本次交接文件本身可能在尚未合併的文件 PR 分支上；私有交接記錄了該分支。
 
+GitHub CLI 在此 checkout 曾預設選到上游 `Anyesh/wardrowbe`，即使推送用的 origin 是自己的 fork。所有 PR／issue 操作都明確指定 `--repo ctfs2001/wardrowbe`；部署設定操作則指定 `--repo ctfs2001/nas-infra`，避免誤開到上游。
+
 ai-dev 的主機診斷權限有限，不能因本次曾由外部 Codex 成功部署，就假定此容器也能直接部署或取得主機 shell。既有的合併／部署授權只記錄為已完成事件，不代表未來任務都已獲授權。
 
 ## 以後如何更新這份交接
