@@ -7,6 +7,7 @@ from app.models.item import ClothingItem
 from app.models.preference import UserPreference
 from app.services.weather_service import WeatherData
 from app.utils.clothing import ITEM_ROLE
+from app.utils.daily_accessories import daily_accessory
 from app.utils.garment_vocabulary import FORMALITY, OCCASION_FORMALITY
 from app.utils.preference_defaults import DEFAULT_PREFER_UNDERUSED_ITEMS
 from app.utils.scales import (
@@ -70,7 +71,7 @@ SENSITIVITY_SHIFT = 5
 
 # An outfit is unwearable without these, so the prompt must keep candidates for them even
 # when a whole category scores below the TOP_N cut and would otherwise be sliced away.
-ESSENTIAL_ROLES = ("footwear", "bottom")
+ESSENTIAL_ROLES = ("footwear", "bottom", "hat", "bag", "eyewear")
 MIN_CANDIDATES_PER_ESSENTIAL_ROLE = 4
 
 TEMP_RANGE_MIN_SWING = 8.0
@@ -374,7 +375,7 @@ def _sort_mandatory_first(
 
 
 def _role_of(scored_item: ScoredItem) -> str | None:
-    return ITEM_ROLE.get((scored_item.item.type or "").lower())
+    return daily_accessory(scored_item.item) or ITEM_ROLE.get((scored_item.item.type or "").lower())
 
 
 def _ensure_role_diversity(

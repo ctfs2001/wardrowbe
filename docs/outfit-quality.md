@@ -23,7 +23,13 @@ exist. Accept/reject buttons now refresh the learning profile immediately.
 - Whole-look rejection supplies no negative color/style signal. Positive feature scores
   count once per look and shrink toward neutral with limited evidence. Explicit user
   color exclusions still apply. Ignore legacy inferred color dislikes in recommendations.
-- Relax the blanket ban on wide tops with wide trousers, make eyewear optional, and
+- Require exactly one hat, bag and eyewear item per look when that category exists in
+  available inventory, alongside exactly one footwear item. All four may repeat daily
+  and across options. Eyewear is identified by the accessories subtype; jewelry does
+  not substitute for glasses. Missing categories are omitted (footwear remains required).
+  Preserve these categories in the capped candidate list. Generated and cached options
+  share validation; cache quality version is 3. This change awaits deployment.
+- Relax the blanket ban on wide tops with wide trousers, and
   require explanations tied to the selected garments' known details.
 
 ## Deployment and limits

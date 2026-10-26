@@ -81,3 +81,53 @@ def test_unworn_small_wardrobe_still_rotates_recommendations():
     assert scores[numbers[2]].score > scores[numbers[1]].score
     assert scores[numbers[3]].exposure_score == 1
     assert scores[numbers[1]].recent_suggestions == 8
+
+
+@pytest.mark.parametrize("missing", [4, 5, 6])
+def test_daily_accessories_required_when_available(missing):
+    numbers, items = wardrobe(["shirt", "pants", "sneakers", "hat", "bag", "accessories"])
+    items[numbers[6]].subtype = "glasses"
+    selection = [n for n in numbers if n != missing]
+    assert "exactly one" in validate_option({"items": selection}, numbers, items, set(), [])[1]
+    assert validate_option({"items": list(numbers)}, numbers, items, set(), [])[1] is None
+
+
+def test_daily_accessories_can_repeat_across_distinct_looks():
+    numbers, items = wardrobe(
+        ["shirt", "pants", "sneakers", "hat", "bag", "accessories", "shirt", "pants"]
+    )
+    items[numbers[6]].subtype = "眼鏡"
+    previous = [{numbers[n] for n in [1, 2, 3, 4, 5, 6]}]
+    assert (
+        validate_option({"items": [7, 8, 3, 4, 5, 6]}, numbers, items, set(), previous)[1] is None
+    )
+
+
+@pytest.mark.parametrize("subtype", ["necklace", "watch", None])
+def test_other_accessories_do_not_require_eyewear(subtype):
+    numbers, items = wardrobe(["shirt", "pants", "sneakers", "accessories"])
+    items[numbers[4]].subtype = subtype
+    assert validate_option({"items": [1, 2, 3]}, numbers, items, set(), [])[1] is None
+
+
+def test_two_bags_are_not_a_valid_daily_accessory_selection():
+    numbers, items = wardrobe(["shirt", "pants", "sneakers", "bag", "bag"])
+    assert "bag" in validate_option({"items": list(numbers)}, numbers, items, set(), [])[1]
+
+
+def test_candidate_limit_preserves_daily_accessory_categories():
+    numbers, items = wardrobe(["shirt"] * 205 + ["pants", "sneakers", "hat", "bag", "accessories"])
+    items[numbers[210]].subtype = "sunglasses"
+    scored = score_items(
+        list(items.values()),
+        _weather(),
+        "casual",
+        None,
+        date(2026, 10, 26),
+        "fall",
+        None,
+        {},
+        {},
+    )
+    assert len(scored) == 200
+    assert {numbers[n] for n in range(206, 211)} <= {s.item.id for s in scored}

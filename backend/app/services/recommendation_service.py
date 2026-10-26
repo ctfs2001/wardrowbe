@@ -96,7 +96,7 @@ def suggestion_context(
     body_measurements: dict | None,
 ) -> dict:
     return {
-        "quality_version": 2,
+        "quality_version": 3,
         "temps": [weather.temperature, weather.feels_like, *(scoring_temp_range(weather) or ())],
         "condition": weather.condition,
         "rain_likely": rain_likely(weather),
@@ -145,7 +145,7 @@ EVENT_NOTES_PREFIX = "活動備註："
 
 # Item types that may be worn again any day: the no-repeat window and today's rejections
 # only apply to clothes, otherwise a small wardrobe runs out of shoes, hats and glasses.
-_REPEAT_OK_TYPES = {"hat", "belt", "accessories"}
+_REPEAT_OK_TYPES = {"hat", "bag", "belt", "accessories"}
 
 
 def _repeat_ok(item_type: str | None) -> bool:

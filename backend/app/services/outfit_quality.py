@@ -4,6 +4,7 @@ from uuid import UUID
 
 from app.models.item import ClothingItem
 from app.utils.clothing import BODY_SLOTS, covered_body_slots, deduplicate_by_body_slot
+from app.utils.daily_accessories import daily_accessory
 from app.utils.garment_vocabulary import FORMALITY, ITEM_ROLE
 
 CORE_ROLES = frozenset({"base_top", "bottom", "full_body", "suit"})
@@ -62,6 +63,12 @@ def validate_option(
     ]
     if levels and max(levels) - min(levels) >= 3:
         return ids, "core pieces and shoes have an extreme formality mismatch"
+    # Only require categories present in the available candidate inventory. Never
+    # fabricate a missing accessory or silently append it to the model's explanation.
+    available = {daily_accessory(item) for item in items.values()} - {None}
+    for category in sorted(available):
+        if sum(daily_accessory(items[iid]) == category for iid in ids) != 1:
+            return ids, f"must select exactly one {category} item from available inventory"
     core = core_items(ids, items)
     for earlier in previous:
         earlier_core = core_items(earlier, items)
