@@ -28,7 +28,7 @@
   "noOutfitsForDate": "Keine Outfits für {date}",
   "outfitCount": "{count, plural, one {# Outfit} other {# Outfits}}",
   "status": {
-    "accepted": "Angenommen",
+    "accepted": "Gefällt mir",
     "expired": "Abgelaufen",
     "pending": "Ausstehend",
     "rejected": "Abgelehnt",

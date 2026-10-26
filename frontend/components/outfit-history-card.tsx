@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ThumbsUp, ThumbsDown, Star, ArrowRight, Shirt, Users, ExternalLink } from 'lucide-react';
+import { Star, ArrowRight, Shirt, Users, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -12,9 +12,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { toast } from 'sonner';
+import { OutfitReactionActions } from '@/components/outfit-reaction-actions';
 import { OutfitStatusIcon } from '@/components/outfit-status';
-import { useAcceptOutfit, useRejectOutfit, type Outfit, type WoreInsteadItem } from '@/lib/hooks/use-outfits';
+import { type Outfit, type WoreInsteadItem } from '@/lib/hooks/use-outfits';
 import { useOccasionLabel, useTypeLabel } from '@/lib/hooks/use-translated-constants';
 import { SourceBadge } from '@/components/shared/source-badge';
 import Image from 'next/image';
@@ -31,29 +31,7 @@ export function OutfitHistoryCard({ outfit, onFeedback, onPreview }: OutfitHisto
   const typeLabel = useTypeLabel();
   const t = useTranslations('history.card');
   const occasionLabel = useOccasionLabel();
-  const acceptOutfit = useAcceptOutfit();
-  const rejectOutfit = useRejectOutfit();
   const [previewItem, setPreviewItem] = useState<WoreInsteadItem | null>(null);
-
-  const handleAccept = async () => {
-    try {
-      await acceptOutfit.mutateAsync(outfit.id);
-      toast.success(t('outfitAccepted'));
-    } catch {
-      toast.error(t('acceptFailed'));
-    }
-  };
-
-  const handleReject = async () => {
-    try {
-      await rejectOutfit.mutateAsync(outfit.id);
-      toast.success(t('outfitDismissed'));
-    } catch {
-      toast.error(t('dismissFailed'));
-    }
-  };
-
-  const isPending = outfit.status === 'pending' || outfit.status === 'sent' || outfit.status === 'viewed';
 
   return (
     <Card className="overflow-hidden h-full flex flex-col">
@@ -197,29 +175,7 @@ export function OutfitHistoryCard({ outfit, onFeedback, onPreview }: OutfitHisto
 
         {/* Action buttons - pushed to bottom */}
         <div className="mt-auto pt-3">
-          {isPending && (
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                className="flex-1 h-8 text-xs"
-                onClick={handleReject}
-                disabled={rejectOutfit.isPending}
-              >
-                <ThumbsDown className="h-3 w-3 mr-1" />
-                {t('dismiss')}
-              </Button>
-              <Button
-                size="sm"
-                className="flex-1 h-8 text-xs"
-                onClick={handleAccept}
-                disabled={acceptOutfit.isPending}
-              >
-                <ThumbsUp className="h-3 w-3 mr-1" />
-                {t('accept')}
-              </Button>
-            </div>
-          )}
+          <OutfitReactionActions outfit={outfit} />
 
           {outfit.status === 'accepted' && outfit.feedback?.actually_worn !== false && (
             <Button

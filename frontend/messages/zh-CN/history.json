@@ -28,7 +28,7 @@
   "noOutfitsForDate": "{date}没有穿搭",
   "outfitCount": "{count, plural, one {# 套穿搭} other {# 套穿搭}}",
   "status": {
-    "accepted": "已采纳",
+    "accepted": "喜欢",
     "expired": "已过期",
     "pending": "待处理",
     "rejected": "已拒绝",

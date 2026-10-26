@@ -28,7 +28,7 @@
   "noOutfitsForDate": "{date}にコーデはありません",
   "outfitCount": "{count, plural, one {# 件のコーデ} other {# 件のコーデ}}",
   "status": {
-    "accepted": "承認済み",
+    "accepted": "好き",
     "expired": "期限切れ",
     "pending": "保留中",
     "rejected": "却下済み",

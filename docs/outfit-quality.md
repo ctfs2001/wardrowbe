@@ -22,6 +22,26 @@ outfit uses the selected wearing date and period; cache contexts isolate dates
 and periods. Requests without a wearing day retain legacy current-weather behavior.
 No database migration is needed. This planning change awaits review and deployment.
 
+## Explicit reactions and recommendation memory
+
+The website uses three actions per look: Accept (worn today and liked), Like
+(preference only), and Dislike (negative preference only). Unanswered/skipped looks
+supply no preference signal. Other options stay available after a reaction. Future
+looks can be liked now and accepted on the wearing day. Accept records a single
+wear per outfit, including concurrent retries; changing a preference preserves the
+wear record. The worn filter checks `feedback.worn_at`, including bulk selection.
+Legacy `/accept` clients keep their original preference-only semantics.
+
+Recommendations read at most 200 explicit responses from the last 180 days, with a
+30-day half-life. Same-core variations on the same day count once. Inferred
+color/style preference bonuses remain bounded (up to 0.15 combined), as does the
+optional pairing bonus (up to 0.15); neither is a blacklist. Rejecting a look does
+not imply disliking all its colors or garments. One suitable exploratory option is
+encouraged without relaxing quality, weather, or daily accessory requirements.
+Existing exposure rotation remains active. Daily cache context expiry makes decay
+effective without another feedback click. Lifetime analytics and records are kept;
+only recommendation-time memory is bounded. This change awaits review/deployment.
+
 ## Changes
 
 - Rank every wardrobe size. Count recommendations in the last seven days separately

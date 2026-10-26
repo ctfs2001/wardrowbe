@@ -14,8 +14,6 @@ import {
   TrendingUp,
   Cloud,
   Droplets,
-  ThumbsUp,
-  ThumbsDown,
   Clock,
   Bell,
   BellOff,
@@ -35,10 +33,10 @@ import { useWeather } from '@/lib/hooks/use-weather';
 import { usePreferences } from '@/lib/hooks/use-preferences';
 import { useOccasionLabel, useWeatherConditionLabel, useTypeLabel } from '@/lib/hooks/use-translated-constants';
 import { displayValue, tempSymbol, TempUnit } from '@/lib/temperature';
-import { usePendingOutfits, useAcceptOutfit, useRejectOutfit } from '@/lib/hooks/use-outfits';
+import { OutfitReactionActions } from '@/components/outfit-reaction-actions';
+import { usePendingOutfits } from '@/lib/hooks/use-outfits';
 import { useSchedules, useNotificationSettings } from '@/lib/hooks/use-notifications';
 import { useFamily } from '@/lib/hooks/use-family';
-import { toast } from 'sonner';
 import { formatShortDate } from '@/lib/utils';
 import { findNextSchedule } from '@/lib/schedules';
 import { useUserTimezone } from '@/lib/hooks/use-user';
@@ -126,30 +124,10 @@ function WeatherCard() {
 function PendingOutfitsCard() {
   const typeLabel = useTypeLabel();
   const { data, isLoading } = usePendingOutfits(2);
-  const acceptOutfit = useAcceptOutfit();
-  const rejectOutfit = useRejectOutfit();
   const t = useTranslations('dashboard');
   const tc = useTranslations('common');
   const occasionLabel = useOccasionLabel();
   const locale = useLocale();
-
-  const handleAccept = async (id: string) => {
-    try {
-      await acceptOutfit.mutateAsync(id);
-      toast.success(t('pendingOutfits.accepted'));
-    } catch {
-      toast.error(t('pendingOutfits.acceptFailed'));
-    }
-  };
-
-  const handleReject = async (id: string) => {
-    try {
-      await rejectOutfit.mutateAsync(id);
-      toast.success(t('pendingOutfits.dismissed'));
-    } catch {
-      toast.error(t('pendingOutfits.dismissFailed'));
-    }
-  };
 
   if (isLoading) {
     return (
@@ -206,7 +184,7 @@ function PendingOutfitsCard() {
       </CardHeader>
       <CardContent className="space-y-3">
         {pendingOutfits.map((outfit) => (
-          <div key={outfit.id} className="flex items-center gap-3">
+          <div key={outfit.id} className="flex flex-wrap items-center gap-3">
             <div className="flex -space-x-2">
               {outfit.items.slice(0, 3).map((item) => (
                 <div
@@ -237,26 +215,8 @@ function PendingOutfitsCard() {
                   : t('pendingOutfits.lookbook')}
               </p>
             </div>
-            <div className="flex gap-1">
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
-                onClick={() => handleReject(outfit.id)}
-                disabled={rejectOutfit.isPending}
-                aria-label={t('pendingOutfits.dismissLabel')}
-              >
-                <ThumbsDown className="h-4 w-4" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8 text-green-500 hover:text-green-600 hover:bg-green-50"
-                onClick={() => handleAccept(outfit.id)}
-                disabled={acceptOutfit.isPending}
-              >
-                <ThumbsUp className="h-4 w-4" />
-              </Button>
+            <div className="w-full">
+              <OutfitReactionActions outfit={outfit} />
             </div>
           </div>
         ))}

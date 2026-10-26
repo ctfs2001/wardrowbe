@@ -10,8 +10,6 @@ import {
   Shirt,
   Sparkles,
   RefreshCw,
-  ThumbsUp,
-  ThumbsDown,
   Cloud,
   Sun,
   CloudRain,
@@ -51,6 +49,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { ItemPicker } from '@/components/shared/item-picker';
+import { OutfitReactionActions } from '@/components/outfit-reaction-actions';
 import { OutfitPlanning } from '@/components/outfit-planning';
 import { OccasionChips } from '@/components/shared/occasion-chips';
 import { useOccasionLabel, useWeatherConditionLabel, useTypeLabel } from '@/lib/hooks/use-translated-constants';
@@ -282,8 +281,7 @@ function OutfitCard({
   baseItemId,
   temperatureUnit,
   t,
-  onAccept,
-  onReject,
+  onUpdate,
   showActions = true,
   badgeLabel,
 }: {
@@ -291,8 +289,7 @@ function OutfitCard({
   baseItemId?: string;
   temperatureUnit: TempUnit;
   t: Translator;
-  onAccept?: () => void;
-  onReject?: () => void;
+  onUpdate?: (outfit: Outfit) => void;
   showActions?: boolean;
   badgeLabel?: string;
 }) {
@@ -380,24 +377,8 @@ function OutfitCard({
         )}
 
         {showActions && (
-          <div className="pt-2 flex gap-2 justify-end border-t mt-auto">
-            {onReject && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onReject}
-                className="h-8 px-2.5 text-muted-foreground hover:text-destructive"
-                aria-label={t('dismissOutfit')}
-              >
-                <ThumbsDown className="h-4 w-4" />
-              </Button>
-            )}
-            {onAccept && (
-              <Button size="sm" onClick={onAccept} className="gap-1.5 text-xs h-8">
-                <ThumbsUp className="h-3.5 w-3.5" />
-                {t('options.chooseThis')}
-              </Button>
-            )}
+          <div className="pt-3 border-t mt-auto">
+            <OutfitReactionActions key={outfit.id} outfit={outfit} onUpdate={onUpdate} />
           </div>
         )}
       </CardContent>
@@ -414,8 +395,7 @@ function OutfitResultsView({
   onSelectOption,
   isCompareAll,
   onToggleCompareAll,
-  onAccept,
-  onReject,
+  onUpdate,
   onTryAnother,
   onNewRequest,
   t,
@@ -428,8 +408,7 @@ function OutfitResultsView({
   onSelectOption: (index: number) => void;
   isCompareAll: boolean;
   onToggleCompareAll: () => void;
-  onAccept: (outfit?: Outfit) => void;
-  onReject: (outfit?: Outfit) => void;
+  onUpdate: (outfit: Outfit) => void;
   onTryAnother: () => void;
   onNewRequest: () => void;
   t: Translator;
@@ -525,8 +504,7 @@ function OutfitResultsView({
                 temperatureUnit={temperatureUnit}
                 t={t}
                 badgeLabel={t('options.optionNumber', { number: idx + 1 })}
-                onAccept={() => onAccept(opt)}
-                onReject={() => onReject(opt)}
+                onUpdate={onUpdate}
                 showActions={true}
               />
             ))}
@@ -547,9 +525,8 @@ function OutfitResultsView({
             temperatureUnit={temperatureUnit}
             t={t}
             badgeLabel={outfits.length > 1 ? t('options.optionNumber', { number: activeOptionIndex + 1 }) : undefined}
-            onAccept={() => onAccept(currentOutfit)}
-            onReject={() => onReject(currentOutfit)}
-            showActions={false}
+            onUpdate={onUpdate}
+            showActions={true}
           />
 
           {/* Action buttons */}
@@ -558,13 +535,7 @@ function OutfitResultsView({
               <RefreshCw className="h-4 w-4" />
               {outfits.length > 1 ? t('options.generateNew') : t('tryAnother')}
             </Button>
-            <Button size="lg" onClick={() => onAccept(currentOutfit)} className="gap-2">
-              <ThumbsUp className="h-4 w-4" />
-              {t('loveIt')}
-            </Button>
-            <Button variant="ghost" size="lg" onClick={() => onReject(currentOutfit)} className="px-3" aria-label={t('dismissOutfit')}>
-              <ThumbsDown className="h-4 w-4" />
-            </Button>
+
           </div>
         </div>
       )}
@@ -577,7 +548,7 @@ function OutfitResultsView({
 async function discardAlternatives(outfits: Outfit[], keepId?: string) {
   await Promise.allSettled(
     outfits
-      .filter((o) => o.id !== keepId)
+      .filter((o) => o.id !== keepId && ['pending', 'sent', 'viewed'].includes(o.status))
       .map((o) => api.post(`/outfits/${o.id}/skip`))
   );
 }
@@ -674,51 +645,14 @@ function SuggestContent() {
     }
   };
 
-  const handleAccept = async (targetOutfit?: Outfit) => {
-    const outfitToAccept = targetOutfit || outfits[activeOptionIndex];
-    if (!outfitToAccept) return;
-
-    applySessionToken(session);
-
-    try {
-      await api.post(`/outfits/${outfitToAccept.id}/accept`);
-      // Every look was already persisted, so the ones left over are marked skipped rather
-      // than rejected: rejecting would auto-exclude their items from today's suggestions,
-      // and those items mostly overlap with the outfit just accepted.
-      await discardAlternatives(outfits, outfitToAccept.id);
-      setOutfits([]);
-      setSelectedOccasion(null);
-    } catch (err) {
-      console.error('Accept error:', err);
-    }
+  const handleReactionUpdate = (updated: Outfit) => {
+    setOutfits(current => current.map(outfit => outfit.id === updated.id ? updated : outfit));
   };
 
   const handleTryAnother = async () => {
     await discardAlternatives(outfits);
     setOutfits([]);
     handleGenerate();
-  };
-
-  const handleReject = async (targetOutfit?: Outfit) => {
-    const outfitToReject = targetOutfit || outfits[activeOptionIndex];
-    if (!outfitToReject) return;
-
-    applySessionToken(session);
-
-    try {
-      await api.post(`/outfits/${outfitToReject.id}/reject`);
-    } catch (err) {
-      console.error('Reject error:', err);
-    }
-
-    const remaining = outfits.filter((o) => o.id !== outfitToReject.id);
-    if (remaining.length > 0) {
-      setOutfits(remaining);
-      setActiveOptionIndex((prev) => Math.min(prev, remaining.length - 1));
-    } else {
-      setOutfits([]);
-      handleGenerate();
-    }
   };
 
   const handleNewRequest = async () => {
@@ -942,8 +876,7 @@ function SuggestContent() {
           occasion={selectedOccasion || 'casual'}
           temperatureUnit={temperatureUnit}
           baseItemId={selectedItem?.id}
-          onAccept={handleAccept}
-          onReject={handleReject}
+          onUpdate={handleReactionUpdate}
           onTryAnother={handleTryAnother}
           onNewRequest={handleNewRequest}
           t={t}

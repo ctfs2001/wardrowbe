@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { OutfitReactionActions } from '@/components/outfit-reaction-actions';
 import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
@@ -189,6 +190,7 @@ export default function OutfitDetailPage() {
         </CardContent>
       </Card>
 
+      {!isTemplate && <OutfitReactionActions outfit={outfit} />}
       <div className="flex flex-wrap gap-2">
         {isTemplate && (
           <Button onClick={handleWearToday} disabled={wearTodayMutation.isPending}>

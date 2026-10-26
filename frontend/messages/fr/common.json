@@ -74,5 +74,17 @@
   "viewAll": "Tout voir",
   "wardrobePrivate": "Votre garde-robe est privée — jamais partagée ni vendue",
   "you": "Vous",
-  "youreOffline": "Vous êtes hors ligne"
+  "youreOffline": "Vous êtes hors ligne",
+  "reaction": {
+    "accept": "Accepter",
+    "acceptHint": "Porté aujourd’hui + aimé",
+    "like": "J’aime",
+    "likeHint": "Préférence seule",
+    "dislike": "Je n’aime pas",
+    "dislikeHint": "Pas pour moi",
+    "neutralHint": "Sans choix, aucune préférence ajoutée. Modifier un avis conserve le port enregistré.",
+    "futureHint": "Aimez une tenue future maintenant, puis acceptez-la le jour où vous la portez.",
+    "wornOn": "Port enregistré : {date}",
+    "error": "Échec de l’enregistrement. Réessayez."
+  }
 }

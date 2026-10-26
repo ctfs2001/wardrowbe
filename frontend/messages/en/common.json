@@ -74,5 +74,17 @@
   "viewAll": "View all",
   "wardrobePrivate": "Your wardrobe is private — never shared or sold",
   "you": "You",
-  "youreOffline": "You're offline"
+  "youreOffline": "You're offline",
+  "reaction": {
+    "accept": "Accept",
+    "acceptHint": "Worn today + like",
+    "like": "Like",
+    "likeHint": "Preference only",
+    "dislike": "Dislike",
+    "dislikeHint": "Not for me",
+    "neutralHint": "No selection adds no preference. Changing a preference keeps the wear record.",
+    "futureHint": "Like a future outfit now; accept it on the day you wear it.",
+    "wornOn": "Wear recorded: {date}",
+    "error": "Could not save. Please retry."
+  }
 }

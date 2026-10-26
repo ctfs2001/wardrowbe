@@ -74,5 +74,17 @@
   "viewAll": "전체 보기",
   "wardrobePrivate": "옷장 정보는 비공개이며 공유되거나 판매되지 않아요",
   "you": "나",
-  "youreOffline": "오프라인 상태예요"
+  "youreOffline": "오프라인 상태예요",
+  "reaction": {
+    "accept": "수락",
+    "acceptHint": "오늘 입음 + 좋아요",
+    "like": "좋아요",
+    "likeHint": "취향만 기록",
+    "dislike": "싫어요",
+    "dislikeHint": "이 코디는 별로",
+    "neutralHint": "선택하지 않으면 취향을 추가하지 않습니다. 취향을 바꿔도 착용 기록은 유지됩니다.",
+    "futureHint": "미래 코디는 먼저 좋아요를 누르고 실제 입는 날 수락하세요.",
+    "wornOn": "착용 기록: {date}",
+    "error": "저장하지 못했습니다. 다시 시도하세요."
+  }
 }
