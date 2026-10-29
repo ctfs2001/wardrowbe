@@ -34,9 +34,17 @@ from app.services.item_service import ItemService
 from app.services.learning_service import LearningService
 from app.services.outfit_service import OutfitListFilters, OutfitService
 from app.services.recommendation_service import (
+    MAX_FILL_ATTEMPTS,
     AIRecommendationError,
+    FillLimitReachedError,
     InsufficientWardrobeError,
+    NoValidOptionError,
     RecommendationService,
+    SuggestionBatch,
+    SuggestionBatchBusyError,
+    SuggestionBatchError,
+    SuggestionBatchExpiredError,
+    SuggestionBatchNotFoundError,
 )
 from app.services.studio_service import (
     ItemOwnershipError,
@@ -173,6 +181,32 @@ class OutfitResponse(BaseModel):
     family_rating_count: int | None = None
     is_starter_suggestion: bool = False
     created_at: datetime
+
+
+class SuggestionBatchInfo(BaseModel):
+    """How many of the requested options one suggest-options request produced.
+
+    Older clients ignore it; the options themselves stay a plain list.
+    """
+
+    id: UUID
+    target_count: int
+    saved_count: int
+    missing_count: int
+    can_fill: bool
+    filling: bool = False
+    expired: bool = False
+    fill_attempts_remaining: int | None = None
+
+
+class SuggestedOutfitResponse(OutfitResponse):
+    suggestion_batch: SuggestionBatchInfo | None = None
+
+
+class SuggestionBatchResponse(BaseModel):
+    batch: SuggestionBatchInfo
+    outfits: list[OutfitResponse]
+    added_outfit_ids: list[UUID] = []
 
 
 class OutfitListResponse(BaseModel):
@@ -486,12 +520,12 @@ async def suggest_outfit(
     return outfit_to_response(outfit, wore_instead_map, is_starter_suggestion=is_starter)
 
 
-@router.post("/suggest-options", response_model=list[OutfitResponse])
+@router.post("/suggest-options", response_model=list[SuggestedOutfitResponse])
 async def suggest_outfit_options(
     request: SuggestRequest,
     db: DbSession,
     current_user: Annotated[User, Depends(get_current_user)],
-) -> list[OutfitResponse]:
+) -> list[SuggestedOutfitResponse]:
     await rate_limit_by_user(str(current_user.id), "suggest", max_requests=10, window_seconds=60)
     weather_override = None
     if request.weather_override:
@@ -556,10 +590,124 @@ async def suggest_outfit_options(
     is_starter = total_items <= 5
 
     wore_instead_map = await fetch_wore_instead_items_map(db, outfits, user_id=current_user.id)
+    batch = _batch_of(outfits)
+    info = _batch_info(current_user, batch, attempts_remaining=MAX_FILL_ATTEMPTS) if batch else None
     return [
-        outfit_to_response(outfit, wore_instead_map, is_starter_suggestion=is_starter)
+        SuggestedOutfitResponse(
+            **dict(outfit_to_response(outfit, wore_instead_map, is_starter_suggestion=is_starter)),
+            suggestion_batch=info,
+        )
         for outfit in outfits
     ]
+
+
+def _batch_of(outfits: list[Outfit]) -> SuggestionBatch | None:
+    meta = (outfits[0].ai_raw_response or {}).get("_batch") if outfits else None
+    if not isinstance(meta, dict):
+        return None
+    return SuggestionBatch(
+        id=UUID(meta["id"]), target=int(meta["target"]), request={}, outfits=outfits
+    )
+
+
+def _batch_info(
+    user: User,
+    batch: SuggestionBatch,
+    *,
+    attempts_remaining: int | None,
+    filling: bool = False,
+) -> SuggestionBatchInfo:
+    expired = bool(batch.wearing_date and batch.wearing_date < get_user_today(user))
+    return SuggestionBatchInfo(
+        id=batch.id,
+        target_count=batch.target,
+        saved_count=len(batch.outfits),
+        missing_count=batch.missing,
+        can_fill=bool(batch.missing) and not filling and not expired and attempts_remaining != 0,
+        filling=filling,
+        expired=expired,
+        fill_attempts_remaining=attempts_remaining,
+    )
+
+
+async def _batch_response(
+    db: AsyncSession,
+    service: RecommendationService,
+    user: User,
+    batch: SuggestionBatch,
+    added: list[Outfit] | None = None,
+) -> SuggestionBatchResponse:
+    filling = await service.is_filling(batch.id) if batch.missing else False
+    remaining = await service.fill_attempts_remaining(batch.id) if batch.missing else None
+    wore_instead_map = await fetch_wore_instead_items_map(db, batch.outfits, user_id=user.id)
+    return SuggestionBatchResponse(
+        batch=_batch_info(user, batch, attempts_remaining=remaining, filling=filling),
+        outfits=[outfit_to_response(o, wore_instead_map) for o in batch.outfits],
+        added_outfit_ids=[o.id for o in added or []],
+    )
+
+
+_BATCH_ERROR_STATUS = {
+    SuggestionBatchNotFoundError: status.HTTP_404_NOT_FOUND,
+    SuggestionBatchBusyError: status.HTTP_409_CONFLICT,
+    SuggestionBatchExpiredError: status.HTTP_409_CONFLICT,
+    FillLimitReachedError: status.HTTP_429_TOO_MANY_REQUESTS,
+}
+
+
+def _coded_error(status_code: int, code: str, message: str) -> HTTPException:
+    return HTTPException(status_code=status_code, detail={"code": code, "message": message})
+
+
+@router.get("/suggestion-batches/{batch_id}", response_model=SuggestionBatchResponse)
+async def get_suggestion_batch(
+    batch_id: UUID,
+    db: DbSession,
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> SuggestionBatchResponse:
+    """Current options of one suggest-options request, e.g. after a fill timed out."""
+    service = RecommendationService(db)
+    batch = await service.get_suggestion_batch(current_user, batch_id)
+    if batch is None:
+        raise _coded_error(
+            status.HTTP_404_NOT_FOUND, "batch_not_found", "Outfit suggestions not found."
+        )
+    return await _batch_response(db, service, current_user, batch)
+
+
+@router.post("/suggestion-batches/{batch_id}/fill", response_model=SuggestionBatchResponse)
+async def fill_suggestion_batch(
+    batch_id: UUID,
+    db: DbSession,
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> SuggestionBatchResponse:
+    """Generate only the missing options of a batch from its saved request snapshot.
+
+    Safe to repeat: a complete batch is returned without calling the AI, and a fill
+    already running for the batch answers 409 fill_in_progress.
+    """
+    await rate_limit_by_user(str(current_user.id), "suggest", max_requests=10, window_seconds=60)
+    service = RecommendationService(db)
+    try:
+        batch, added = await service.fill_suggestion_batch(current_user, batch_id)
+    except SuggestionBatchError as e:
+        raise _coded_error(_BATCH_ERROR_STATUS[type(e)], e.code, str(e)) from None
+    except AIDisabledError:
+        raise _coded_error(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "ai_disabled",
+            "Internal AI is disabled; outfit suggestions are deferred to an external agent.",
+        ) from None
+    except NoValidOptionError as e:
+        raise _coded_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "fill_no_valid_option", str(e)
+        ) from None
+    except AIRecommendationError as e:
+        logger.error(f"AI recommendation error while filling batch {batch_id}: {e}")
+        raise _coded_error(status.HTTP_503_SERVICE_UNAVAILABLE, "ai_unavailable", str(e)) from None
+    except (InsufficientWardrobeError, ValueError) as e:
+        raise _coded_error(status.HTTP_400_BAD_REQUEST, "request_invalid", str(e)) from None
+    return await _batch_response(db, service, current_user, batch, added)
 
 
 class SuggestionCreateRequest(OutfitAttributeFields):

@@ -2,9 +2,11 @@ import hashlib
 import json
 import logging
 import re
-from dataclasses import dataclass
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, field, fields
 from datetime import UTC, date, datetime, timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,6 +35,12 @@ from app.services.item_scorer import (
     temperature_band,
 )
 from app.services.outfit_quality import core_items, validate_option
+from app.services.recommendation_diagnostics import (
+    AI_CALL_FAILED,
+    AI_RESPONSE_TRUNCATED,
+    PARSE_ERROR,
+    RecommendationDiagnostics,
+)
 from app.services.recommendation_memory import recent_recommendation_memory
 from app.services.suggestion_cache import pop_suggestion, push_suggestions
 from app.services.weather_service import (
@@ -49,6 +57,7 @@ from app.utils.preference_defaults import (
     DEFAULT_TEMPERATURE_SENSITIVITY,
 )
 from app.utils.prompts import load_prompt
+from app.utils.redis_lock import get_redis
 from app.utils.timezone import get_user_now, get_user_timezone, get_user_today
 
 logger = logging.getLogger(__name__)
@@ -65,6 +74,68 @@ SINGLE_OUTFIT_FORMAT = (
     '"styling_tip": "One specific, actionable styling detail — do not suggest rolling up '
     'sleeves every time, vary your advice"}}'
 )
+
+
+# Explicit AI call budget. One generation request makes the initial call plus at most
+# MAX_REPAIR_CALLS repairs; a suggestion batch accepts at most MAX_FILL_ATTEMPTS manual
+# "fill the missing options" requests that reach the AI, each with the same budget.
+MAX_REPAIR_CALLS = 1
+MAX_FILL_ATTEMPTS = 3
+FILL_ATTEMPTS_TTL_SECONDS = 2 * 24 * 3600
+
+OPTION_COUNT_SENTENCE = "Respond with valid JSON containing exactly 3 distinct outfit options."
+
+
+def _with_option_count(prompt: str, count: int) -> str:
+    """Ask for the number of options this call needs.
+
+    The template asks for three; a repair or fill that needs one must not also say
+    "exactly 3" in the same prompt.
+    """
+    noun = "option" if count == 1 else "options"
+    return prompt.replace(
+        OPTION_COUNT_SENTENCE,
+        f"Respond with valid JSON containing exactly {count} distinct outfit {noun}.",
+    ).replace("across the 3 outfits", "across the outfits")
+
+
+def _fill_lock_key(batch_id: UUID) -> int:
+    # pg advisory locks take a signed bigint.
+    return int.from_bytes(batch_id.bytes[:8], "big", signed=True)
+
+
+def _weather_from_dict(data: dict) -> WeatherData:
+    names = {f.name for f in fields(WeatherData)}
+    values = {k: v for k, v in data.items() if k in names}
+    values["timestamp"] = datetime.fromisoformat(values["timestamp"])
+    return WeatherData(**values)
+
+
+def _fill_attempts_key(batch_id: UUID) -> str:
+    return f"suggest:fill-attempts:{batch_id}"
+
+
+@dataclass
+class SuggestionBatch:
+    """Options generated together by one multi-option request.
+
+    Stored without a schema change: every saved option carries the batch id, target and
+    the original request snapshot under ``ai_raw_response["_batch"]``.
+    """
+
+    id: UUID
+    target: int
+    request: dict
+    outfits: list[Outfit] = field(default_factory=list)
+
+    @property
+    def missing(self) -> int:
+        return max(self.target - len(self.outfits), 0)
+
+    @property
+    def wearing_date(self) -> date | None:
+        dates = [o.scheduled_for for o in self.outfits if o.scheduled_for]
+        return min(dates) if dates else None
 
 
 def get_time_of_day(user: User) -> TimeOfDay:
@@ -607,7 +678,9 @@ class RecommendationService:
                         except json.JSONDecodeError:
                             break
 
-        logger.warning(f"Unparsable AI reply len={len(content or '')}: {content!r}")
+        # The reply can echo the user's event notes, so only its size goes to the normal log.
+        logger.warning("Unparsable AI reply len=%d", len(content or ""))
+        logger.debug("Unparsable AI reply: %r", content)
         raise ValueError(f"Could not parse AI response as JSON: {content[:200]}")
 
     def _parse_multi_outfit_response(self, content: str) -> list[dict]:
@@ -786,7 +859,15 @@ class RecommendationService:
         scheduled_date: date | None = None,
         event_notes: str | None = None,
         activity_needs: list[ActivityNeed] | None = None,
+        fill_batch: SuggestionBatch | None = None,
     ) -> list[Outfit]:
+        """Generate, validate and save outfit options.
+
+        A multi-option request becomes a suggestion batch: its saved options carry the
+        request snapshot so a later fill can generate only the missing options. With
+        ``fill_batch`` this generates ``count`` options for that batch, keeping its
+        existing options and comparing new core pieces against them.
+        """
         # Guard first so deferral is unconditional, before any location/weather work.
         require_internal_ai("text")
 
@@ -798,10 +879,15 @@ class RecommendationService:
 
         # Determine cache eligibility before auto-merge
         event_notes = (event_notes or "").strip()[:EVENT_NOTES_MAX] or None
+        request_event_notes = event_notes
         if activity_needs:
             event_notes = "\n".join(filter(None, [activity_notes(activity_needs), event_notes]))
         # Looks made for a specific event must not be cached and reused for a normal request.
-        use_cache = not exclude_items and not single_outfit and not event_notes
+        use_cache = (
+            not exclude_items and not single_outfit and not event_notes and fill_batch is None
+        )
+        starts_batch = fill_batch is None and not single_outfit and count > 1
+        request_id = fill_batch.id if fill_batch else uuid4()
 
         # Rejecting a combination does not blacklist its individual garments.
 
@@ -836,6 +922,24 @@ class RecommendationService:
                 raise ValueError(
                     "Could not fetch weather data. Please try again or provide weather manually."
                 ) from e
+
+        # Everything a fill needs to reproduce this request. Stored with the saved
+        # options (the outfits already hold the notes), never logged.
+        batch_request = (
+            fill_batch.request
+            if fill_batch
+            else {
+                "occasion": occasion,
+                "time_of_day": time_of_day.value,
+                "scheduled_date": scheduled_date.isoformat() if scheduled_date else None,
+                "weather": weather.to_dict(),
+                "event_notes": request_event_notes,
+                "activity_needs": list(dict.fromkeys(activity_needs or [])),
+                "include_items": [str(i) for i in include_items],
+                "exclude_items": [str(i) for i in exclude_items],
+                "source": source.value,
+            }
+        )
 
         preferences = user.preferences
         drop_legwear = stays_above_hot_threshold(weather, preferences)
@@ -897,6 +1001,11 @@ class RecommendationService:
         # Recent complete core combinations are excluded, rather than all their clothes.
         recent_cores = [set(core_items(set(combo), candidate_map)) for combo in recent_combinations]
         recent_cores = [combo for combo in recent_cores if combo]
+        # Options the user already has from this batch: new ones must differ from them.
+        kept_ids = [
+            {oi.item_id for oi in outfit.items}
+            for outfit in (fill_batch.outfits if fill_batch else [])
+        ]
 
         # Check cache for pre-generated suggestions (used when count is 1)
         if use_cache and count == 1:
@@ -942,7 +1051,7 @@ class RecommendationService:
                     drop_legwear=drop_legwear,
                 )
                 if problem:
-                    logger.info("Skipping cached suggestion: %s", problem)
+                    logger.info("Skipping cached suggestion: %s", problem.code)
                     continue
 
                 logger.info(f"Using cached suggestion for user {user.id}, occasion: {occasion}")
@@ -1044,85 +1153,74 @@ class RecommendationService:
                 flags=re.DOTALL,
             )
 
+        if kept_ids:
+            prompt += (
+                "\nALREADY SAVED FOR THIS REQUEST: the user keeps these options. New options must "
+                "use different tops, bottoms, one-piece garments or suits (selected mandatory "
+                "pieces may repeat): "
+                f"{json.dumps(self._numbers_for(kept_ids, number_map))}."
+            )
+
+        target = 1 if single_outfit else count
+        diagnostics = RecommendationDiagnostics(
+            request_id=request_id,
+            kind="fill" if fill_batch else ("options" if starts_batch else "single"),
+            target=target,
+            kept=len(kept_ids),
+        )
         logger.info(
-            f"Generating recommendation for user {user.id}, "
-            f"occasion: {occasion}, items: {len(scored)}"
+            "Generating recommendation request_id=%s user=%s occasion=%s candidates=%d "
+            "target=%d kept=%d",
+            request_id,
+            user.id,
+            occasion,
+            len(scored),
+            target,
+            len(kept_ids),
         )
 
         try:
-            result = await ai_service.generate_text(
-                prompt, return_metadata=True, task_name="recommendation"
+            approved = await self._select_options(
+                ai_service,
+                prompt,
+                target=target,
+                # The template asks for three: a single /suggest still gets spare options
+                # for the cache. A fill asks only for what is missing.
+                want=target if (fill_batch or single_outfit) else max(target, 3),
+                stop_at=max(target, 3) if use_cache else target,
+                number_map=number_map,
+                candidate_map=candidate_map,
+                mandatory=mandatory,
+                previous=[*recent_cores, *kept_ids],
+                kept_ids=kept_ids,
+                drop_legwear=drop_legwear,
+                variety_pool={
+                    si.item.id
+                    for si in scored
+                    if si.weather_score >= 0.6 and si.formality_score >= 0.5
+                },
+                diagnostics=diagnostics,
+                task_name="recommendation_fill" if fill_batch else "recommendation",
             )
-            logger.info(
-                f"AI recommendation generated (model: {result.model}, endpoint: {result.endpoint})"
-            )
-            logger.debug(f"AI raw response: {result.content[:500]}")
-
-            target = 1 if single_outfit else count
-            approved: list[dict] = []
-            approved_ids: list[set[UUID]] = []
-            variety_pool = {
-                si.item.id for si in scored if si.weather_score >= 0.6 and si.formality_score >= 0.5
-            }
-            previous = list(recent_cores)
-            errors: list[str] = []
-            # At most one repair request, on the already configured provider. Validate
-            # everything before persisting: failed options never enter outfit history.
-            for attempt in range(2):
-                try:
-                    options = self._parse_multi_outfit_response(result.content)
-                except (ValueError, TypeError) as exc:
-                    options = []
-                    errors.append(str(exc)[:200])
-                for option in options:
-                    ids, problem = validate_option(
-                        option,
-                        number_map,
-                        candidate_map,
-                        mandatory,
-                        previous,
-                        drop_legwear=drop_legwear,
-                        batch_previous=approved_ids,
-                        variety_pool=variety_pool,
-                    )
-                    if problem:
-                        errors.append(problem)
-                        continue
-                    option = dict(option)
-                    option["_ai_model"] = result.model
-                    option["_ai_endpoint"] = result.endpoint
-                    approved.append(option)
-                    approved_ids.append(ids)
-                    previous.append(ids)
-                    if len(approved) >= max(target, 3 if use_cache else target):
-                        break
-                if len(approved) >= target or attempt == 1:
-                    break
-                kept = [od["items"] for od in approved]
-                repair_prompt = (
-                    prompt + "\nQUALITY CHECK: Generate replacement options only. "
-                    "Each explanation must describe its exact selected pieces. "
-                    f"Already accepted (do not repeat): {json.dumps(kept)}. "
-                    f"Fix these problems: {'; '.join(dict.fromkeys(errors))}. "
-                    f"Need {target - len(approved)} additional complete options."
-                )
-                try:
-                    result = await ai_service.generate_text(
-                        repair_prompt, return_metadata=True, task_name="recommendation_repair"
-                    )
-                except Exception:
-                    if not approved:
-                        raise
-                    logger.warning("Repair failed; returning validated options", exc_info=True)
-                    break
             if not approved:
-                raise AIRecommendationError(
+                raise NoValidOptionError(
                     "Could not build a complete, distinct outfit from the available items. "
                     "Try changing selected items or the occasion."
                 )
 
+            batch_meta = None
+            if starts_batch or fill_batch:
+                batch_meta = {
+                    "id": str(request_id),
+                    "target": fill_batch.target if fill_batch else target,
+                    "request": batch_request,
+                    "diagnostics": diagnostics.summary(saved=min(len(approved), target)),
+                }
+            first_position = len(fill_batch.outfits) if fill_batch else 0
             outfits = []
-            for option in approved[:target]:
+            for position, option in enumerate(approved[:target], first_position):
+                if batch_meta:
+                    option = {**option, "_batch": {**batch_meta, "position": position}}
                 outfits.append(
                     await self._materialize_outfit(
                         option,
@@ -1138,6 +1236,7 @@ class RecommendationService:
                         event_notes=event_notes,
                     )
                 )
+            diagnostics.finish(saved=len(outfits))
             if use_cache and len(approved) > target:
                 serializable_map = {str(k): str(v) for k, v in number_map.items()}
                 to_cache = [
@@ -1148,18 +1247,130 @@ class RecommendationService:
             return outfits
 
         except AIRecommendationError:
+            diagnostics.finish(saved=0)
             raise
         except AIResponseTruncatedError as e:
             # Preserve the specific, actionable cause instead of the generic message
             # below — the AI endpoint responded successfully, it just didn't produce
             # any output content (see AIResponseTruncatedError for why).
+            diagnostics.finish(saved=0)
             logger.error(f"AI recommendation failed: {e}")
             raise AIRecommendationError(str(e)) from e
         except Exception as e:
+            diagnostics.finish(saved=0)
             logger.error(f"AI recommendation failed: {e}")
             raise AIRecommendationError(
                 "AI service is not available. Please check your AI endpoint configuration in Settings."
             ) from e
+
+    @staticmethod
+    def _numbers_for(id_sets: list[set[UUID]], number_map: dict[int, UUID]) -> list[list[int]]:
+        uuid_to_number = {v: k for k, v in number_map.items()}
+        return [sorted(uuid_to_number[i] for i in ids if i in uuid_to_number) for ids in id_sets]
+
+    async def _select_options(
+        self,
+        ai_service: AIService,
+        prompt: str,
+        *,
+        target: int,
+        want: int,
+        stop_at: int,
+        number_map: dict[int, UUID],
+        candidate_map: dict[UUID, ClothingItem],
+        mandatory: set[UUID],
+        previous: list[set[UUID]],
+        kept_ids: list[set[UUID]],
+        drop_legwear: bool,
+        variety_pool: set[UUID],
+        diagnostics: RecommendationDiagnostics,
+        task_name: str,
+    ) -> list[dict]:
+        """Ask the configured provider for options and keep only those passing every check.
+
+        Makes the initial call plus at most MAX_REPAIR_CALLS repairs. Validates everything
+        before anything is persisted: failed options never enter outfit history. Each repair
+        asks for exactly the number still missing.
+        """
+        approved: list[dict] = []
+        approved_ids: list[set[UUID]] = []
+        previous = list(previous)
+        errors: list[str] = []
+        requested, phase = want, task_name
+        request_prompt = _with_option_count(prompt, want)
+        for attempt in range(1 + MAX_REPAIR_CALLS):
+            record = diagnostics.start_attempt(phase, requested)
+            try:
+                result = await ai_service.generate_text(
+                    request_prompt, return_metadata=True, task_name=phase
+                )
+            except Exception as exc:
+                diagnostics.ai_failed(
+                    record,
+                    AI_RESPONSE_TRUNCATED
+                    if isinstance(exc, AIResponseTruncatedError)
+                    else AI_CALL_FAILED,
+                )
+                if not approved:
+                    raise
+                logger.warning(
+                    "Repair failed; returning validated options request_id=%s",
+                    diagnostics.request_id,
+                    exc_info=True,
+                )
+                break
+            diagnostics.ai_answered(record, result.model)
+            logger.info(
+                f"AI recommendation generated (model: {result.model}, endpoint: {result.endpoint})"
+            )
+            logger.debug(f"AI raw response: {result.content[:500]}")
+
+            try:
+                options = self._parse_multi_outfit_response(result.content)
+            except (ValueError, TypeError) as exc:
+                options = []
+                errors.append(str(exc)[:200])
+                record.rejected[PARSE_ERROR] += 1
+            record.returned = len(options)
+            for option in options:
+                ids, problem = validate_option(
+                    option,
+                    number_map,
+                    candidate_map,
+                    mandatory,
+                    previous,
+                    drop_legwear=drop_legwear,
+                    batch_previous=[*kept_ids, *approved_ids],
+                    variety_pool=variety_pool,
+                )
+                if problem:
+                    errors.append(problem)
+                    record.rejected[problem.code] += 1
+                    continue
+                option = dict(option)
+                option["_ai_model"] = result.model
+                option["_ai_endpoint"] = result.endpoint
+                approved.append(option)
+                approved_ids.append(ids)
+                previous.append(ids)
+                record.approved += 1
+                if len(approved) >= stop_at:
+                    break
+            diagnostics.finish_attempt(record)
+            if len(approved) >= target or attempt == MAX_REPAIR_CALLS:
+                break
+            requested = target - len(approved)
+            phase = f"{task_name}_repair"
+            accepted = [od["items"] for od in approved] + self._numbers_for(kept_ids, number_map)
+            noun = "option" if requested == 1 else "options"
+            request_prompt = _with_option_count(prompt, requested) + (
+                "\nQUALITY CHECK: Generate replacement options only. "
+                f'Return exactly {requested} new complete {noun} in the "outfits" array. '
+                "Each explanation must describe its exact selected pieces. "
+                f"Already accepted (do not repeat): {json.dumps(accepted)}. "
+                f"Fix these problems: {'; '.join(dict.fromkeys(errors))}."
+            )
+        return approved
 
     async def generate_recommendation(
         self,
@@ -1191,6 +1402,117 @@ class RecommendationService:
         )
         return outfits[0]
 
+    async def get_suggestion_batch(self, user: User, batch_id: UUID) -> SuggestionBatch | None:
+        """Load a batch's saved options, whatever their status or feedback, oldest first."""
+        result = await self.db.execute(
+            select(Outfit)
+            .where(
+                Outfit.user_id == user.id,
+                Outfit.ai_raw_response[("_batch", "id")].astext == str(batch_id),
+            )
+            .options(
+                selectinload(Outfit.items).selectinload(OutfitItem.item),
+                selectinload(Outfit.feedback),
+                selectinload(Outfit.family_ratings).selectinload(FamilyOutfitRating.user),
+            )
+            .execution_options(populate_existing=True)
+        )
+        outfits = list(result.scalars().all())
+        if not outfits:
+            return None
+        outfits.sort(key=lambda o: (o.ai_raw_response["_batch"].get("position", 0), o.created_at))
+        meta = outfits[0].ai_raw_response["_batch"]
+        return SuggestionBatch(
+            id=batch_id, target=int(meta["target"]), request=meta["request"], outfits=outfits
+        )
+
+    @asynccontextmanager
+    async def _fill_lock(self, batch_id: UUID) -> AsyncIterator[bool]:
+        """Try to take a batch's advisory lock on its own connection, without waiting.
+
+        Transaction scoped: released when the fill finishes or fails, and by PostgreSQL if
+        the connection drops, so a crashed fill can never block the batch.
+        """
+        async with self.db.bind.connect() as conn, conn.begin():
+            acquired = await conn.scalar(
+                select(func.pg_try_advisory_xact_lock(_fill_lock_key(batch_id)))
+            )
+            yield bool(acquired)
+
+    async def is_filling(self, batch_id: UUID) -> bool:
+        async with self._fill_lock(batch_id) as acquired:
+            return not acquired
+
+    async def fill_attempts_remaining(self, batch_id: UUID) -> int | None:
+        """None when the counter cannot be read."""
+        try:
+            redis = await get_redis()
+            used = int(await redis.get(_fill_attempts_key(batch_id)) or 0)
+        except Exception:
+            logger.warning("Fill attempt counter unavailable request_id=%s", batch_id)
+            return None
+        return max(MAX_FILL_ATTEMPTS - used, 0)
+
+    async def _claim_fill_attempt(self, batch_id: UUID) -> bool:
+        try:
+            redis = await get_redis()
+            pipe = redis.pipeline(transaction=True)
+            pipe.incr(_fill_attempts_key(batch_id))
+            pipe.expire(_fill_attempts_key(batch_id), FILL_ATTEMPTS_TTL_SECONDS)
+            used, _ = await pipe.execute()
+        except Exception:
+            # Same stance as the request rate limiter; each fill still has its own call budget.
+            logger.warning("Fill attempt counter unavailable, allowing request_id=%s", batch_id)
+            return True
+        return int(used) <= MAX_FILL_ATTEMPTS
+
+    async def fill_suggestion_batch(
+        self, user: User, batch_id: UUID
+    ) -> tuple[SuggestionBatch, list[Outfit]]:
+        """Generate only the options a batch is missing, from its original request.
+
+        Existing options, their ids, content and feedback are never touched. Concurrent or
+        repeated requests for the same batch are serialised by an advisory lock: one runs,
+        others get SuggestionBatchBusyError, and a retry after success finds the batch
+        complete and returns it without calling the AI.
+        """
+        async with self._fill_lock(batch_id) as acquired:
+            if not acquired:
+                raise SuggestionBatchBusyError("These outfits are already being completed.")
+            batch = await self.get_suggestion_batch(user, batch_id)
+            if batch is None:
+                raise SuggestionBatchNotFoundError("Outfit suggestions not found.")
+            if not batch.missing:
+                logger.info("Suggestion batch already complete request_id=%s", batch_id)
+                return batch, []
+            if batch.wearing_date and batch.wearing_date < get_user_today(user):
+                raise SuggestionBatchExpiredError(
+                    "These suggestions are for a past date. Generate new outfits instead."
+                )
+            require_internal_ai("text")
+            if not await self._claim_fill_attempt(batch_id):
+                raise FillLimitReachedError(
+                    "No more attempts to complete these outfits. Generate new outfits instead."
+                )
+            request = batch.request
+            added = await self.generate_recommendations(
+                user=user,
+                occasion=request["occasion"],
+                weather_override=_weather_from_dict(request["weather"]),
+                exclude_items=[UUID(i) for i in request.get("exclude_items") or []],
+                include_items=[UUID(i) for i in request.get("include_items") or []],
+                source=OutfitSource(request.get("source") or OutfitSource.on_demand),
+                time_of_day=TimeOfDay(request["time_of_day"]),
+                count=batch.missing,
+                scheduled_date=date.fromisoformat(request["scheduled_date"])
+                if request.get("scheduled_date")
+                else None,
+                event_notes=request.get("event_notes"),
+                activity_needs=request.get("activity_needs") or None,
+                fill_batch=batch,
+            )
+            return await self.get_suggestion_batch(user, batch_id) or batch, added
+
 
 class InsufficientWardrobeError(Exception):
     pass
@@ -1198,6 +1520,30 @@ class InsufficientWardrobeError(Exception):
 
 class AIRecommendationError(Exception):
     pass
+
+
+class NoValidOptionError(AIRecommendationError):
+    """The AI answered, but no option passed the quality checks."""
+
+
+class SuggestionBatchError(Exception):
+    code = "suggestion_batch_error"
+
+
+class SuggestionBatchNotFoundError(SuggestionBatchError):
+    code = "batch_not_found"
+
+
+class SuggestionBatchBusyError(SuggestionBatchError):
+    code = "fill_in_progress"
+
+
+class SuggestionBatchExpiredError(SuggestionBatchError):
+    code = "batch_expired"
+
+
+class FillLimitReachedError(SuggestionBatchError):
+    code = "fill_limit_reached"
 
 
 # An outfit with nothing left to wear after cleanup; one bad option among several, or a
