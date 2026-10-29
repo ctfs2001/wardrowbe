@@ -42,6 +42,70 @@ Existing exposure rotation remains active. Daily cache context expiry makes deca
 effective without another feedback click. Lifetime analytics and records are kept;
 only recommendation-time memory is bounded. This change awaits review/deployment.
 
+## Fewer options than requested
+
+`/outfits/suggest-options` still asks for three looks and still returns a plain JSON
+array, so older clients keep working. Each element now also carries an optional
+`suggestion_batch` object (`id`, `target_count`, `saved_count`, `missing_count`,
+`can_fill`, `filling`, `expired`, `fill_attempts_remaining`). When fewer than three
+looks pass the checks, the suggest page says "2 of 3" and offers **Complete the
+remaining outfits**. Quality rules are not relaxed to reach the count.
+
+- `POST /outfits/suggestion-batches/{id}/fill` generates only the missing looks from
+  the batch's saved request snapshot: wearing date, period, the weather used for the
+  original request (no new forecast), occasion, quick needs, free-text notes, pinned
+  and excluded items. New looks pass the same completeness, accessory, formality and
+  repeat checks and must differ in core pieces from the looks already kept; pinned
+  items may still repeat. Existing looks, their IDs, content and reactions are never
+  modified. `GET /outfits/suggestion-batches/{id}` returns the current state.
+- Repeats are safe: a PostgreSQL advisory lock per batch lets one fill run; a
+  concurrent request gets `409 fill_in_progress` without calling the AI, and a retry
+  after success returns the complete batch without calling it again. The page
+  disables the button while filling and, after a timeout or 409, polls the batch.
+- Errors carry `detail.code`: `ai_unavailable`, `fill_no_valid_option`,
+  `batch_expired` (wearing date passed), `fill_limit_reached`, `request_invalid`
+  (e.g. a pinned item was archived), `batch_not_found`. Existing looks stay on screen.
+- The snapshot lives under `ai_raw_response["_batch"]` of each saved look, so no
+  migration is needed.
+
+AI call budget: a normal request makes one call, plus at most one repair when fewer
+than three looks pass. Each user-initiated fill makes at most two calls (generation
+plus one repair) and asks only for the missing count. At most three fills per batch
+reach the AI (Redis counter, two-day TTL; if Redis is unavailable the counter fails
+open like the existing rate limiter, and the shared 10-per-minute suggest limit
+still applies). There are no automatic or unbounded retries. Repair and fill prompts
+now ask for exactly the number still needed instead of repeating "exactly 3".
+
+### Diagnostics
+
+Every generation logs `recommendation_attempt` (per AI call) and
+`recommendation_result` (per request) as single-line JSON sharing a `request_id`,
+which equals the batch id for multi-option requests and fills. Records contain
+counts, the model name and stable reason codes only, never prompts, replies,
+notes, item descriptions or credentials. The request summary is also stored with
+the saved looks under `_batch.diagnostics`.
+
+| Code | Meaning |
+|---|---|
+| `model_short_response` | The model returned fewer options than requested |
+| `parse_error` | The reply was not usable JSON |
+| `invalid_format` | Items were not a list of integer wardrobe numbers |
+| `unavailable_item` | A number outside the available candidates |
+| `missing_mandatory` | A pinned item was left out |
+| `incomplete_outfit` | No top/bottom or full-body garment |
+| `footwear_count` | Not exactly one pair of shoes |
+| `slot_conflict` | Two pieces occupy the same body slot |
+| `hot_weather_legwear` | Unrequested legwear in consistently hot weather |
+| `formality_mismatch` | Extreme formality gap between core pieces and shoes |
+| `missing_daily_accessory` | Eyewear, hat or bag missing although available |
+| `duplicate_in_batch` | Repeats the core of another look in the same batch |
+| `duplicate_recent` | Repeats the core of a recently suggested look |
+| `reused_key_piece` | Reuses a key piece while suitable unused ones remain |
+| `ai_call_failed` / `ai_response_truncated` | The provider call failed or returned no content |
+
+An unparsable reply now logs only its length at WARNING level; the full text is
+logged at DEBUG only, because it can echo private event notes.
+
 ## Changes
 
 - Rank every wardrobe size. Count recommendations in the last seven days separately
@@ -56,7 +120,8 @@ only recommendation-time memory is bounded. This change awaits review/deployment
   about the original look. Cache entries use the same checks and a versioned context.
 - If needed, make **at most one repair call to the existing AI provider**. This can add
   latency and token use. Return fewer valid options if repair fails; never fill the
-  result with invalid outfits. No valid option produces an actionable error.
+  result with invalid outfits. No valid option produces an actionable error. A short
+  result is reported to the page, which can fill only the gap (see above).
 - Whole-look rejection supplies no negative color/style signal. Positive feature scores
   count once per look and shrink toward neutral with limited evidence. Explicit user
   color exclusions still apply. Ignore legacy inferred color dislikes in recommendations.

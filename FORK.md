@@ -14,7 +14,8 @@
 | 推薦輪替與回饋 | `item_scorer.py`、`learning_service.py` | 未記錄實穿也依最近七天推薦次數輪替上衣、褲子；拒絕整套不封鎖單品、不推論討厭所有顏色，接受／拒絕立即更新學習資料 |
 | 每日配件必選與可重複 | `recommendation_service.py`（`_repeat_ok`） | 有可用庫存時每套選眼鏡、帽、包各一件及一雙鞋；實穿避重複不限制鞋、帽、包、眼鏡、皮帶；推薦曝光扣分不限制配件。眼鏡依 accessories 子類型識別 |
 | 候選品項上限 | `backend/app/services/item_scorer.py`（`TOP_N`） | 70 → 200，避免帽子、眼鏡、鞋子被擠出清單 |
-| AI 回覆解析失敗時記錄全文 | `recommendation_service.py`（`_parse_ai_response`） | 方便除錯 |
+| 不足三套時說明並只補缺額 | `recommendation_service.py`、`recommendation_diagnostics.py`、`outfits.py`（`suggestion-batches`）、建議頁 | `suggest-options` 仍回陣列，另附 `suggestion_batch`；畫面顯示「目前取得 2／3 套」，可沿用原請求快照只補缺額，不覆蓋既有方案與回饋。同一請求以 `request_id` 記錄各次 AI 回傳數、通過數與淘汰 reason code。詳見 [穿搭邏輯](docs/outfit-quality.md) |
+| AI 回覆解析失敗時的紀錄 | `recommendation_service.py`（`_parse_ai_response`） | 一般 log 只記長度；全文只在 DEBUG 層級，避免把活動備註寫進日誌 |
 | 提示詞 | `backend/app/prompts/recommendation.txt`、`item_pairing.txt` | 整套正式度協調、必配鞋、眼鏡依需求選用、皮帶規則、輪廓比例與繁體中文輸出 |
 | 個人風格 | 環境變數 `STYLE_NOTES`（`backend/app/config.py`） | 自由文字的穿衣風格描述，會加進推薦提示詞。內容不放在公開 repo，由主機設定 |
 | helper 附加服務 | `backend/addons/helper/` | 整理照片、讀品牌和材質、以圖搜圖查商品資訊，見該目錄的 README。放在 `backend/` 底下是為了一起打包進 backend 映像 |
