@@ -10,8 +10,16 @@
 
 如果私有檔不存在，仍可依本檔理解程式，但正式環境的即時狀態需要重新查證，不能把歷史部署資訊當作目前狀態。
 
-## 2026-10-30 待審核：不足三套時說明並只補缺額
+## 2026-10-30 CI 沒有建立執行紀錄時的手動重跑
 
+- PR #10 開啟與合併時，GitHub 沒有為它建立任何 workflow run 或 check suite：CI 的 `push`／`pull_request`、以及 `pull_request_target` 類（Semantic PR title、labeler、auto-assign）全部沒有紀錄；repo 公開事件也沒有該分支與合併後 main 的 PushEvent。repo 端已排除：Actions 為 enabled／all、各 workflow 為 active、PR 未改 `.github`、commit 與合併訊息沒有 skip 標記、帳號正常，且 10-26 同樣流程正常。GitHub 狀態頁當時沒有公告事件，因此只能確定是事件沒有分派到 Actions，無法再往下判定。
+- `ci.yml` 新增 `workflow_dispatch`，七項檢查與觸發條件不變。之後若 main 最新 commit 沒有任何 run，可由具 write 權限的帳號手動執行：`gh workflow run ci.yml --repo ctfs2001/wardrowbe --ref main`。手動執行的結果記在同一個 commit 上，部署端照樣要求七項必要檢查全部成功。
+- CI 通過只代表可成為部署候選，仍需主人確認指定版本後才部署；本段不是部署授權。
+- ai-dev 的 gh 帳號不是 repo admin，讀 `actions/permissions` 會得到 403；這與 CI 沒觸發無關。
+
+## 2026-10-30 已合併：不足三套時說明並只補缺額
+
+- PR #10 已合併，merge commit `a0e147d`。合併後的 main 因上段原因沒有 CI 紀錄，需等 CI 在包含此修改的 main 上通過，才會成為部署候選。以下為合併前的審核內容。
 - 分支 `ai/fill-missing-outfit-options`（基於 main `c52f4d1`）。起因：要求三套、修正後只剩兩套時，後端回 HTTP 200 兩套，畫面沒有說明，被淘汰原因也沒有留下。
 - `/outfits/suggest-options` 仍回傳陣列；每個元素多一個可選 `suggestion_batch`（目標數、已存數、缺額、可否補生）。建議頁顯示「目前取得 2／3 套穿搭」與「補齊剩餘穿搭」。品質規則不放寬。
 - 新增 `POST /outfits/suggestion-batches/{id}/fill` 與 `GET /outfits/suggestion-batches/{id}`。補生沿用原請求快照（日期、時段、當時天氣、場合、快捷需求、自由備註、指定與排除單品），新方案需通過原有檢查並與已保留方案的核心衣物不同；既有方案的 ID、內容、回饋不變。
