@@ -5,6 +5,8 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+  # Manual re-run when GitHub creates no run for a push (see docs/HANDOFF.md).
+  workflow_dispatch:
 
 jobs:
   actionlint:
