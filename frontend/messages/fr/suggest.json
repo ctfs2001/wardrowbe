@@ -131,5 +131,22 @@
     "retry": "Réessayer",
     "forecastFor": "Prévisions du {date} · {timezone}",
     "temperatureRange": "Température sur la période : {min}–{max}"
+  },
+  "shortfall": {
+    "title": "{saved} tenues sur {target} prêtes",
+    "description": "Certaines propositions de l'IA n'ont pas passé les contrôles de complétude, d'accessoires ou de variété ; seules les tenues validées sont affichées.",
+    "fill": "{count, plural, one {Compléter la tenue manquante} other {Compléter les # tenues manquantes}}",
+    "filling": "Ajout des tenues manquantes…",
+    "added": "{count, plural, one {# tenue ajoutée} other {# tenues ajoutées}}",
+    "errors": {
+      "aiUnavailable": "Le service d'IA n'a pas répondu. Vos tenues actuelles sont conservées ; réessayez plus tard.",
+      "noValidOption": "La nouvelle proposition n'a pas passé les contrôles de qualité. Vos tenues actuelles sont conservées ; vous pouvez réessayer.",
+      "expired": "Ces tenues concernent une date passée. Générez de nouvelles tenues.",
+      "limitReached": "Plus aucune tentative possible pour compléter cette série. Générez une nouvelle série.",
+      "requestInvalid": "Un article ou une condition sélectionnés ne sont plus disponibles. Ajustez-les et générez à nouveau.",
+      "notFound": "Ces suggestions de tenues ne sont plus disponibles. Générez une nouvelle série.",
+      "stillRunning": "Les tenues sont toujours en cours d'ajout. Revenez dans un instant.",
+      "generic": "Impossible de compléter les tenues. Vos tenues actuelles sont conservées."
+    }
   }
 }

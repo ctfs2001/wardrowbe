@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -56,7 +56,7 @@ import { useOccasionLabel, useWeatherConditionLabel, useTypeLabel } from '@/lib/
 import { useItem } from '@/lib/hooks/use-items';
 import { api, ApiError } from '@/lib/api';
 import { applySessionToken } from '@/lib/hooks/use-session-token';
-import { ActivityNeed, WearDay, WearPeriod, ClothingTypeValue, CurrentWeather, Item, Outfit, SuggestRequest } from '@/lib/types';
+import { ActivityNeed, WearDay, WearPeriod, ClothingTypeValue, CurrentWeather, Item, Outfit, SuggestRequest, SuggestionBatchInfo, SuggestionBatchResponse } from '@/lib/types';
 import { useWeather } from '@/lib/hooks/use-weather';
 import { usePreferences } from '@/lib/hooks/use-preferences';
 import { cn, formatShortDate } from '@/lib/utils';
@@ -386,6 +386,86 @@ function OutfitCard({
   );
 }
 
+function fillErrorMessage(error: unknown, t: Translator): string {
+  const code = error instanceof ApiError
+    ? (error.data as { detail?: { code?: string } } | undefined)?.detail?.code
+    : undefined;
+  switch (code) {
+    case 'ai_unavailable':
+    case 'ai_disabled':
+      return t('shortfall.errors.aiUnavailable');
+    case 'fill_no_valid_option':
+      return t('shortfall.errors.noValidOption');
+    case 'batch_expired':
+      return t('shortfall.errors.expired');
+    case 'fill_limit_reached':
+      return t('shortfall.errors.limitReached');
+    case 'request_invalid':
+      return t('shortfall.errors.requestInvalid');
+    case 'batch_not_found':
+      return t('shortfall.errors.notFound');
+    default:
+      return t('shortfall.errors.generic');
+  }
+}
+
+// A request can come back with fewer options than asked for when the rest fail the
+// quality checks. Say so, and offer to generate only the missing ones.
+function OutfitShortfallNotice({
+  batch,
+  isFilling,
+  fillError,
+  fillNotice,
+  onFill,
+  t,
+}: {
+  batch: SuggestionBatchInfo | null;
+  isFilling: boolean;
+  fillError: string | null;
+  fillNotice: string | null;
+  onFill: () => void;
+  t: Translator;
+}) {
+  if (!batch || (batch.missing_count === 0 && !fillNotice)) return null;
+  if (batch.missing_count === 0) {
+    return (
+      <p role="status" className="text-sm text-muted-foreground text-center">{fillNotice}</p>
+    );
+  }
+  const blockedReason = batch.expired
+    ? t('shortfall.errors.expired')
+    : batch.fill_attempts_remaining === 0
+      ? t('shortfall.errors.limitReached')
+      : null;
+  return (
+    <Alert role="status" data-testid="outfit-shortfall">
+      <AlertCircle className="h-4 w-4" />
+      <AlertDescription className="space-y-2">
+        <p className="font-medium text-foreground">
+          {t('shortfall.title', { saved: batch.saved_count, target: batch.target_count })}
+        </p>
+        <p>{t('shortfall.description')}</p>
+        {fillError && <p className="text-destructive">{fillError}</p>}
+        {blockedReason && !fillError ? (
+          <p>{blockedReason}</p>
+        ) : !blockedReason && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-2"
+            onClick={onFill}
+            disabled={isFilling || (!batch.can_fill && !batch.filling)}
+            aria-busy={isFilling}
+          >
+            {isFilling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            {isFilling ? t('shortfall.filling') : t('shortfall.fill', { count: batch.missing_count })}
+          </Button>
+        )}
+      </AlertDescription>
+    </Alert>
+  );
+}
+
 function OutfitResultsView({
   outfits,
   occasion,
@@ -398,6 +478,7 @@ function OutfitResultsView({
   onUpdate,
   onTryAnother,
   onNewRequest,
+  shortfall,
   t,
 }: {
   outfits: Outfit[];
@@ -411,6 +492,7 @@ function OutfitResultsView({
   onUpdate: (outfit: Outfit) => void;
   onTryAnother: () => void;
   onNewRequest: () => void;
+  shortfall: React.ReactNode;
   t: Translator;
 }) {
   const locale = useLocale();
@@ -455,6 +537,8 @@ function OutfitResultsView({
           </Badge>
         </div>
       )}
+
+      {shortfall}
 
       {/* Options Switcher Bar (when multiple outfits exist) */}
       {outfits.length > 1 && (
@@ -584,6 +668,13 @@ function SuggestContent() {
   const [activeOptionIndex, setActiveOptionIndex] = useState<number>(0);
   const [isCompareAll, setIsCompareAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [batch, setBatch] = useState<SuggestionBatchInfo | null>(null);
+  const [isFilling, setIsFilling] = useState(false);
+  const [fillError, setFillError] = useState<string | null>(null);
+  const [fillNotice, setFillNotice] = useState<string | null>(null);
+  // Refs, not state: a second click in the same render must already see the first one.
+  const fillInFlight = useRef(false);
+  const activeBatchId = useRef<string | null>(null);
 
   useEffect(() => {
     if (preselectedItem && !selectedItem) {
@@ -633,6 +724,7 @@ function SuggestContent() {
       const result = await api.post<Outfit[]>('/outfits/suggest-options', request);
       setOutfits(result);
       setActiveOptionIndex(0);
+      resetBatch(result[0]?.suggestion_batch ?? null);
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
@@ -645,6 +737,78 @@ function SuggestContent() {
     }
   };
 
+  const resetBatch = (next: SuggestionBatchInfo | null) => {
+    activeBatchId.current = next?.id ?? null;
+    setBatch(next);
+    setFillError(null);
+    setFillNotice(null);
+  };
+
+  // Keep the options already on screen, with their reactions, and append only new ones.
+  const applyBatch = (response: SuggestionBatchResponse) => {
+    if (activeBatchId.current !== response.batch.id) return;
+    setOutfits(current => {
+      const known = new Set(current.map(outfit => outfit.id));
+      return [...current, ...response.outfits.filter(outfit => !known.has(outfit.id))];
+    });
+    // Both lists keep the batch order, so the first new option has the same index here.
+    const firstAdded = response.outfits.findIndex(outfit => response.added_outfit_ids.includes(outfit.id));
+    if (firstAdded >= 0) setActiveOptionIndex(firstAdded);
+    setBatch(response.batch);
+    if (response.added_outfit_ids.length) {
+      setFillNotice(t('shortfall.added', { count: response.added_outfit_ids.length }));
+    }
+  };
+
+  // A fill that is still running elsewhere (double submit, or a retry after a timeout):
+  // wait for it instead of starting another AI request.
+  const waitForRunningFill = async (batchId: string) => {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      const current = await api.get<SuggestionBatchResponse>(`/outfits/suggestion-batches/${batchId}`);
+      if (!current.batch.filling) return current;
+    }
+    return null;
+  };
+
+  const handleFillMissing = async () => {
+    const batchId = batch?.id;
+    if (!batchId || fillInFlight.current) return;
+    fillInFlight.current = true;
+    applySessionToken(session);
+    setIsFilling(true);
+    setFillError(null);
+    setFillNotice(null);
+    try {
+      applyBatch(await api.post<SuggestionBatchResponse>(`/outfits/suggestion-batches/${batchId}/fill`));
+    } catch (err) {
+      const code = err instanceof ApiError
+        ? (err.data as { detail?: { code?: string } } | undefined)?.detail?.code
+        : undefined;
+      // A dropped connection or gateway timeout may hide a fill that is still running.
+      const mayStillRun = code === 'fill_in_progress'
+        || (err instanceof Error && err.name === 'NetworkError')
+        || (err instanceof ApiError && [502, 504].includes(err.status));
+      if (mayStillRun) {
+        try {
+          const settled = await waitForRunningFill(batchId);
+          if (settled) applyBatch(settled);
+          else if (activeBatchId.current === batchId) setFillError(t('shortfall.errors.stillRunning'));
+        } catch (pollErr) {
+          if (activeBatchId.current === batchId) setFillError(fillErrorMessage(pollErr, t));
+        }
+      } else if (activeBatchId.current === batchId) {
+        setFillError(fillErrorMessage(err, t));
+        if (code === 'batch_expired') setBatch(current => current && { ...current, expired: true, can_fill: false });
+        if (code === 'fill_limit_reached') setBatch(current => current && { ...current, fill_attempts_remaining: 0, can_fill: false });
+      }
+      console.error('Fill suggestion error:', err);
+    } finally {
+      fillInFlight.current = false;
+      setIsFilling(false);
+    }
+  };
+
   const handleReactionUpdate = (updated: Outfit) => {
     setOutfits(current => current.map(outfit => outfit.id === updated.id ? updated : outfit));
   };
@@ -652,12 +816,14 @@ function SuggestContent() {
   const handleTryAnother = async () => {
     await discardAlternatives(outfits);
     setOutfits([]);
+    resetBatch(null);
     handleGenerate();
   };
 
   const handleNewRequest = async () => {
     await discardAlternatives(outfits);
     setOutfits([]);
+    resetBatch(null);
     setActiveOptionIndex(0);
     setIsCompareAll(false);
     setSelectedOccasion(null);
@@ -879,6 +1045,16 @@ function SuggestContent() {
           onUpdate={handleReactionUpdate}
           onTryAnother={handleTryAnother}
           onNewRequest={handleNewRequest}
+          shortfall={
+            <OutfitShortfallNotice
+              batch={batch}
+              isFilling={isFilling}
+              fillError={fillError}
+              fillNotice={fillNotice}
+              onFill={handleFillMissing}
+              t={t}
+            />
+          }
           t={t}
         />
       )}

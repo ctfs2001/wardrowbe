@@ -131,5 +131,22 @@
     "retry": "Erneut versuchen",
     "forecastFor": "Vorhersage für {date} · {timezone}",
     "temperatureRange": "Temperatur im Tragezeitraum: {min}–{max}"
+  },
+  "shortfall": {
+    "title": "{saved} von {target} Outfits bereit",
+    "description": "Einige KI-Vorschläge haben die Prüfung auf Vollständigkeit, Accessoires oder Abwechslung nicht bestanden. Angezeigt werden nur die bestandenen Outfits.",
+    "fill": "{count, plural, one {Fehlendes Outfit ergänzen} other {Fehlende # Outfits ergänzen}}",
+    "filling": "Fehlende Outfits werden ergänzt…",
+    "added": "{count, plural, one {# Outfit ergänzt} other {# Outfits ergänzt}}",
+    "errors": {
+      "aiUnavailable": "Der KI-Dienst hat nicht geantwortet. Deine aktuellen Outfits bleiben erhalten; bitte versuche es später erneut.",
+      "noValidOption": "Der neue Vorschlag hat die Qualitätsprüfung nicht bestanden. Deine aktuellen Outfits bleiben erhalten; du kannst es erneut versuchen.",
+      "expired": "Diese Outfits gelten für ein vergangenes Datum. Erstelle stattdessen neue Outfits.",
+      "limitReached": "Für dieses Set sind keine weiteren Versuche möglich. Erstelle stattdessen ein neues Set.",
+      "requestInvalid": "Ein ausgewähltes Teil oder eine Bedingung ist nicht mehr verfügbar. Passe die Auswahl an und erstelle neu.",
+      "notFound": "Diese Outfit-Vorschläge sind nicht mehr verfügbar. Erstelle ein neues Set.",
+      "stillRunning": "Die Outfits werden noch ergänzt. Bitte schau gleich noch einmal nach.",
+      "generic": "Die Outfits konnten nicht ergänzt werden. Deine aktuellen Outfits bleiben erhalten."
+    }
   }
 }

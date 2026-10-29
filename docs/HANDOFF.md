@@ -1,6 +1,6 @@
 # Wardrowbe 最新交接入口
 
-更新日期：2026-10-26。此檔是固定入口；下次對話先讀本檔，再讀下列 ai-dev 私有交接。
+更新日期：2026-10-30。此檔是固定入口；下次對話先讀本檔，再讀下列 ai-dev 私有交接。
 
 ## 先讀取什麼
 
@@ -10,8 +10,20 @@
 
 如果私有檔不存在，仍可依本檔理解程式，但正式環境的即時狀態需要重新查證，不能把歷史部署資訊當作目前狀態。
 
-## 2026-10-26 待審核：喜好與實穿操作整合
+## 2026-10-30 待審核：不足三套時說明並只補缺額
 
+- 分支 `ai/fill-missing-outfit-options`（基於 main `c52f4d1`）。起因：要求三套、修正後只剩兩套時，後端回 HTTP 200 兩套，畫面沒有說明，被淘汰原因也沒有留下。
+- `/outfits/suggest-options` 仍回傳陣列；每個元素多一個可選 `suggestion_batch`（目標數、已存數、缺額、可否補生）。建議頁顯示「目前取得 2／3 套穿搭」與「補齊剩餘穿搭」。品質規則不放寬。
+- 新增 `POST /outfits/suggestion-batches/{id}/fill` 與 `GET /outfits/suggestion-batches/{id}`。補生沿用原請求快照（日期、時段、當時天氣、場合、快捷需求、自由備註、指定與排除單品），新方案需通過原有檢查並與已保留方案的核心衣物不同；既有方案的 ID、內容、回饋不變。
+- 防重複：每批次一把 PostgreSQL advisory lock；同時第二個請求回 409 `fill_in_progress` 不呼叫 AI；成功後重送直接回完整批次不呼叫 AI。前端按鈕補生中停用，逾時或 409 時輪詢批次狀態。
+- 呼叫上限：一般請求初次 1 次＋最多 1 次修正；每次補生最多 2 次（只要求缺額）；每批最多 3 次補生會呼叫 AI（Redis 計數，Redis 不可用時與既有 rate limit 一樣放行）。修正與補生提示詞改為要求「剛好缺額數」，不再同時出現「exactly 3」。
+- 診斷：`recommendation_attempt`／`recommendation_result` 單行 JSON，共用 `request_id`（多套請求等於批次 id），只含數量、模型名稱與穩定 reason code，不含提示詞、回覆、備註、衣櫃內容或憑證；摘要也存於方案的 `ai_raw_response._batch.diagnostics`。代碼表見 [推薦邏輯](outfit-quality.md)。無法解析的 AI 回覆在一般 log 只記長度。
+- 不需 migration、新 provider 或新機密；快照存在既有 JSONB 欄位。正式部署流程不會自動跑 alembic，因此刻意不新增資料表。
+- 本地驗證（隔離 PostgreSQL、模擬 AI）：新增後端測試 14 項＋品質 reason code 測試 6 項；後端完整套件除 17 項需真實 Redis 的既有測試外全過（同 17 項在未修改的 main 也因本機無 Redis 失敗）。前端 72 檔 708 項、TypeScript、lint、i18n、build 通過。完整結果以 PR CI 為準。
+
+## 2026-10-26 已合併：喜好與實穿操作整合
+
+- PR #9 已合併，merge commit `c52f4d1`；下列為合併前的審核紀錄。
 - [PR #9](https://github.com/ctfs2001/wardrowbe/pull/9)，分支 `ai/outfit-feedback-and-learning`：每套建議、歷史、詳情與首頁共用「接受（今天穿過＋喜歡）／喜歡（只記喜好）／不喜歡」。選擇後保留其他方案；未選／略過不新增喜好。未來日期先按喜歡，實穿當天才可接受。
 - 新增 `/outfits/{id}/reaction`，以列鎖防止重複實穿；反覆接受不累加單品次數，改喜好不刪實穿紀錄。既有 `/accept` API 保留原本僅喜歡的語意，避免替舊客戶端虛構實穿。
 - 「已穿過」及其全選操作改查 `feedback.worn_at`，不再以 accepted 狀態代替實穿。

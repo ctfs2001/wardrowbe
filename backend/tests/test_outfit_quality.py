@@ -154,3 +154,33 @@ def test_promoting_accessories_does_not_evict_existing_essential_candidates():
     ]
     result = _ensure_role_diversity(scored, top_n=198)[:198]
     assert {numbers[n] for n in range(196, 201)} <= {s.item.id for s in result}
+
+
+@pytest.mark.parametrize(
+    "types,selection,code",
+    [
+        (["shirt", "pants", "sneakers"], "1,2,3", "invalid_format"),
+        (["shirt", "pants", "sneakers"], [1, 2, 999], "unavailable_item"),
+        (["shirt", "sneakers"], [1, 2], "incomplete_outfit"),
+        (["shirt", "pants", "sneakers", "boots"], [1, 2, 3, 4], "footwear_count"),
+        (["shirt", "pants", "shorts", "sneakers"], [1, 2, 3, 4], "slot_conflict"),
+    ],
+)
+def test_rejections_carry_stable_reason_codes(types, selection, code):
+    numbers, items = wardrobe(types)
+    _, error = validate_option({"items": selection}, numbers, items, set(), [])
+    assert error.code == code
+    assert isinstance(error, str) and error  # still the instruction sent to the model
+
+
+def test_repeat_code_separates_this_batch_from_recent_history():
+    numbers, items = wardrobe(["shirt", "pants", "sneakers", "hat"])
+    look = {numbers[n] for n in [1, 2, 3]}
+    option = {"items": [1, 2, 3, 4]}
+    _, recent = validate_option(option, numbers, items, set(), [look])
+    _, in_batch = validate_option(
+        option, numbers, items, set(), [{numbers[1], numbers[2]}, look], batch_previous=[look]
+    )
+    assert recent.code == "duplicate_recent"
+    assert in_batch.code == "duplicate_in_batch"
+    assert recent == in_batch

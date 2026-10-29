@@ -131,5 +131,22 @@
     "retry": "Riprova",
     "forecastFor": "Previsioni per {date} · {timezone}",
     "temperatureRange": "Temperatura nella fascia scelta: {min}–{max}"
+  },
+  "shortfall": {
+    "title": "{saved} outfit su {target} pronti",
+    "description": "Alcune proposte dell'IA non hanno superato i controlli di completezza, accessori o varietà, quindi sono mostrati solo gli outfit validi.",
+    "fill": "{count, plural, one {Completa l'outfit mancante} other {Completa i # outfit mancanti}}",
+    "filling": "Aggiunta degli outfit mancanti…",
+    "added": "{count, plural, one {# outfit aggiunto} other {# outfit aggiunti}}",
+    "errors": {
+      "aiUnavailable": "Il servizio IA non ha risposto. Gli outfit attuali sono stati mantenuti; riprova più tardi.",
+      "noValidOption": "La nuova proposta non ha superato i controlli di qualità. Gli outfit attuali sono stati mantenuti; puoi riprovare.",
+      "expired": "Questi outfit sono per una data passata. Genera nuovi outfit.",
+      "limitReached": "Non ci sono altri tentativi per completare questa serie. Genera una nuova serie.",
+      "requestInvalid": "Un capo o una condizione selezionati non sono più disponibili. Modificali e genera di nuovo.",
+      "notFound": "Questi suggerimenti non sono più disponibili. Genera una nuova serie.",
+      "stillRunning": "Stiamo ancora completando gli outfit. Ricontrolla tra poco.",
+      "generic": "Impossibile completare gli outfit. Gli outfit attuali sono stati mantenuti."
+    }
   }
 }
