@@ -374,6 +374,26 @@ export interface Outfit {
   family_rating_count: number | null;
   is_starter_suggestion: boolean;
   created_at: string;
+  // Only on /outfits/suggest-options results.
+  suggestion_batch?: SuggestionBatchInfo | null;
+}
+
+// How many of the requested options one suggest-options request produced.
+export interface SuggestionBatchInfo {
+  id: string;
+  target_count: number;
+  saved_count: number;
+  missing_count: number;
+  can_fill: boolean;
+  filling: boolean;
+  expired: boolean;
+  fill_attempts_remaining: number | null;
+}
+
+export interface SuggestionBatchResponse {
+  batch: SuggestionBatchInfo;
+  outfits: Outfit[];
+  added_outfit_ids: string[];
 }
 
 export type WearDay = 'today' | 'tomorrow';

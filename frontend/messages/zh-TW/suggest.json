@@ -131,5 +131,22 @@
     "retry": "重試預報",
     "forecastFor": "{date} 的預報・{timezone}",
     "temperatureRange": "穿著時段溫度：{min}–{max}"
+  },
+  "shortfall": {
+    "title": "目前取得 {saved}／{target} 套穿搭",
+    "description": "部分 AI 方案沒有通過完整度、配件或防重複檢查，先保留通過檢查的穿搭。",
+    "fill": "補齊剩餘 {count} 套穿搭",
+    "filling": "正在補齊剩餘穿搭…",
+    "added": "已補上 {count} 套穿搭",
+    "errors": {
+      "aiUnavailable": "AI 服務暫時沒有回應，已保留目前的穿搭，請稍後再試。",
+      "noValidOption": "這次補生的方案沒有通過品質檢查，已保留目前的穿搭，可以再試一次。",
+      "expired": "這批穿搭的日期已過，請重新產生。",
+      "limitReached": "這批穿搭已達補生次數上限，請重新產生整批穿搭。",
+      "requestInvalid": "原本指定的單品或條件已無法使用，請調整後重新產生。",
+      "notFound": "找不到這批穿搭建議，請重新產生。",
+      "stillRunning": "仍在補齊穿搭，請稍後再查看。",
+      "generic": "無法補齊穿搭，已保留目前的穿搭。"
+    }
   }
 }

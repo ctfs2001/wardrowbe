@@ -131,5 +131,22 @@
     "retry": "Retry forecast",
     "forecastFor": "Forecast for {date} · {timezone}",
     "temperatureRange": "Wearing window: {min}–{max}"
+  },
+  "shortfall": {
+    "title": "{saved} of {target} outfits ready",
+    "description": "Some AI options did not pass the completeness, accessory or variety checks, so only the outfits that passed are shown.",
+    "fill": "Complete the remaining {count, plural, one {# outfit} other {# outfits}}",
+    "filling": "Completing the missing outfits…",
+    "added": "{count, plural, one {Added # outfit} other {Added # outfits}}",
+    "errors": {
+      "aiUnavailable": "The AI service did not respond. Your current outfits are kept; please try again later.",
+      "noValidOption": "The new option did not pass the quality checks. Your current outfits are kept; you can try again.",
+      "expired": "These outfits are for a past date. Generate new outfits instead.",
+      "limitReached": "No more attempts to complete this set. Generate a new set instead.",
+      "requestInvalid": "A selected item or condition is no longer available. Adjust it and generate again.",
+      "notFound": "These outfit suggestions are no longer available. Generate a new set instead.",
+      "stillRunning": "Still completing the outfits. Please check again in a moment.",
+      "generic": "Could not complete the outfits. Your current outfits are kept."
+    }
   }
 }
