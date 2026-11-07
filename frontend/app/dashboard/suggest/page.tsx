@@ -386,6 +386,39 @@ function OutfitCard({
   );
 }
 
+// Stable quality reason codes from the backend (docs/outfit-quality.md) to the hint shown.
+function qualityReasonKey(reason: string | null | undefined): string {
+  switch (reason) {
+    case 'incomplete_outfit':
+      return 'qualityFailure.reasons.incompleteOutfit';
+    case 'missing_mandatory':
+      return 'qualityFailure.reasons.missingMandatory';
+    case 'slot_conflict':
+      return 'qualityFailure.reasons.slotConflict';
+    case 'footwear_count':
+      return 'qualityFailure.reasons.footwearCount';
+    case 'missing_daily_accessory':
+      return 'qualityFailure.reasons.missingDailyAccessory';
+    case 'formality_mismatch':
+      return 'qualityFailure.reasons.formalityMismatch';
+    case 'duplicate_in_batch':
+    case 'duplicate_recent':
+    case 'reused_key_piece':
+      return 'qualityFailure.reasons.duplicate';
+    default:
+      return 'qualityFailure.reasons.other';
+  }
+}
+
+// A request where every AI option failed the quality checks says which check, in the
+// user's language; any other server error keeps its message.
+function suggestErrorMessage(error: ApiError, t: Translator): string {
+  const detail = (error.data as { detail?: { code?: string; reason?: string | null } } | undefined)
+    ?.detail;
+  if (typeof detail !== 'object' || detail?.code !== 'no_valid_option') return error.message;
+  return t('qualityFailure.message', { reason: t(qualityReasonKey(detail.reason)) });
+}
+
 function fillErrorMessage(error: unknown, t: Translator): string {
   const code = error instanceof ApiError
     ? (error.data as { detail?: { code?: string } } | undefined)?.detail?.code
@@ -727,7 +760,7 @@ function SuggestContent() {
       resetBatch(result[0]?.suggestion_batch ?? null);
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.message);
+        setError(suggestErrorMessage(err, t));
       } else {
         setError(t('error'));
       }

@@ -15,6 +15,19 @@
   },
   "dismissOutfit": "关闭穿搭",
   "error": "生成穿搭建议失败，请重试。",
+  "qualityFailure": {
+    "message": "AI 提供的穿搭都没有通过检查：{reason}。可以换个指定单品或场合再试。",
+    "reasons": {
+      "incompleteOutfit": "缺少上衣或下装",
+      "missingMandatory": "没有包含指定的单品",
+      "slotConflict": "同一个部位选了两件",
+      "footwearCount": "鞋子不是刚好一双",
+      "missingDailyAccessory": "缺少每天要搭的眼镜、帽子或包",
+      "formalityMismatch": "衣服和鞋子的正式程度差太多",
+      "duplicate": "和最近的建议重复",
+      "other": "不符合穿搭规则"
+    }
+  },
   "feedback": {
     "commentsOptional": "评论（选填）",
     "commentsPlaceholder": "对这套穿搭有什么想法？",

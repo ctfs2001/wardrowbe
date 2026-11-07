@@ -573,6 +573,12 @@ async def suggest_outfit_options(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Internal AI is disabled; outfit suggestions are deferred to an external agent.",
         ) from None
+    except NoValidOptionError as e:
+        logger.error(f"AI recommendation error: {e} (reason: {e.reason})")
+        # Same status as before; the coded detail lets the page say which check failed.
+        raise _no_valid_option_error(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "no_valid_option", e
+        ) from None
     except AIRecommendationError as e:
         logger.error(f"AI recommendation error: {e}")
         raise HTTPException(
@@ -659,6 +665,14 @@ def _coded_error(status_code: int, code: str, message: str) -> HTTPException:
     return HTTPException(status_code=status_code, detail={"code": code, "message": message})
 
 
+def _no_valid_option_error(status_code: int, code: str, e: NoValidOptionError) -> HTTPException:
+    # reason is a stable quality reason code (docs/outfit-quality.md), never item details.
+    return HTTPException(
+        status_code=status_code,
+        detail={"code": code, "message": str(e), "reason": e.reason},
+    )
+
+
 @router.get("/suggestion-batches/{batch_id}", response_model=SuggestionBatchResponse)
 async def get_suggestion_batch(
     batch_id: UUID,
@@ -699,8 +713,8 @@ async def fill_suggestion_batch(
             "Internal AI is disabled; outfit suggestions are deferred to an external agent.",
         ) from None
     except NoValidOptionError as e:
-        raise _coded_error(
-            status.HTTP_422_UNPROCESSABLE_ENTITY, "fill_no_valid_option", str(e)
+        raise _no_valid_option_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "fill_no_valid_option", e
         ) from None
     except AIRecommendationError as e:
         logger.error(f"AI recommendation error while filling batch {batch_id}: {e}")

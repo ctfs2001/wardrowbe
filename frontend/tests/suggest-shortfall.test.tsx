@@ -140,6 +140,27 @@ describe('suggestion shortfall', () => {
     expect(fillButton()).toBeEnabled()
   })
 
+  it('says which quality check failed when no outfit passed', async () => {
+    vi.mocked(api.post).mockRejectedValueOnce(
+      new ApiError('Could not build a complete, distinct outfit', 503, {
+        detail: { code: 'no_valid_option', message: 'Could not build', reason: 'incomplete_outfit' },
+      }),
+    )
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: 'getSuggestion' }))
+    expect(
+      await screen.findByText('qualityFailure.message reason=qualityFailure.reasons.incompleteOutfit'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/Could not build/)).not.toBeInTheDocument()
+  })
+
+  it('keeps the server message for other suggestion errors', async () => {
+    vi.mocked(api.post).mockRejectedValueOnce(new ApiError('Wardrobe too small', 400, { detail: 'Wardrobe too small' }))
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: 'getSuggestion' }))
+    expect(await screen.findByText('Wardrobe too small')).toBeInTheDocument()
+  })
+
   it('stops offering a fill once the attempt limit is reached', async () => {
     await generate([look('one'), look('two')])
     vi.mocked(api.post).mockRejectedValueOnce(

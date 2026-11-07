@@ -55,7 +55,7 @@ ONE FORMALITY LEVEL PER OUTFIT (most important — check every piece before answ
 
 RULES:
 - Build the look around ONE of these silhouettes. They are equally valid; choose whichever suits the wardrobe and the occasion, do not assume separates:
-  - Separates: ONE top (<<BASE_TOP_TYPES>>) + ONE bottom (<<BOTTOM_TYPES>>) + ONE footwear (<<FOOTWEAR_TYPES>>)
+  - Separates: ONE top (<<BASE_TOP_TYPES>>) + ONE bottom (<<BOTTOM_TYPES>>) + ONE footwear (<<FOOTWEAR_TYPES>>). A <<STANDALONE_TOP_TYPES>> may be the top by itself (short-sleeved ones included) or go over one of those tops as a layer
   - One-piece: ONE full-body garment (<<FULL_BODY_TYPES>>) + ONE footwear (<<FOOTWEAR_TYPES>>)
   - Suit: ONE top + ONE suit (<<SUIT_TYPES>>) + ONE footwear; the suit replaces the bottom
 - OPTIONAL: legwear (<<LEGWEAR_TYPES>>) under a skirt, dress or shorts in cool or cold weather; leave it out when it is warm, and put only thermal legwear under trousers or a jumpsuit, only when it is very cold. Legwear does not replace the bottom, the one-piece garment or footwear

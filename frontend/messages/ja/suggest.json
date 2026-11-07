@@ -15,6 +15,19 @@
   },
   "dismissOutfit": "このコーデを見送る",
   "error": "コーデ提案の生成に失敗しました。もう一度お試しください。",
+  "qualityFailure": {
+    "message": "AI のコーデがどれもチェックを通りませんでした：{reason}。指定アイテムやシーンを変えて、もう一度お試しください。",
+    "reasons": {
+      "incompleteOutfit": "トップスかボトムスが足りません",
+      "missingMandatory": "指定したアイテムが入っていません",
+      "slotConflict": "同じ部位に 2 点選ばれています",
+      "footwearCount": "靴がちょうど 1 足ではありません",
+      "missingDailyAccessory": "毎日使うメガネ・帽子・バッグが足りません",
+      "formalityMismatch": "服と靴のフォーマル度が離れすぎています",
+      "duplicate": "最近の提案と重複しています",
+      "other": "コーデのルールに合っていません"
+    }
+  },
   "feedback": {
     "commentsOptional": "コメント（任意）",
     "commentsPlaceholder": "このコーデについてどう思いますか？",

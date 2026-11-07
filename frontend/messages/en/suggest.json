@@ -15,6 +15,19 @@
   },
   "dismissOutfit": "Dismiss outfit",
   "error": "Failed to generate outfit suggestion. Please try again.",
+  "qualityFailure": {
+    "message": "None of the AI's outfits passed the checks: {reason}. Try a different selected item or occasion.",
+    "reasons": {
+      "incompleteOutfit": "a top or bottom was missing",
+      "missingMandatory": "the selected item was left out",
+      "slotConflict": "two pieces were chosen for the same body area",
+      "footwearCount": "there was not exactly one pair of shoes",
+      "missingDailyAccessory": "the daily eyewear, hat or bag was missing",
+      "formalityMismatch": "the clothes and shoes were far apart in formality",
+      "duplicate": "they repeated recent suggestions",
+      "other": "they did not follow the outfit rules"
+    }
+  },
   "feedback": {
     "commentsOptional": "Comments (optional)",
     "commentsPlaceholder": "Any thoughts about this outfit?",

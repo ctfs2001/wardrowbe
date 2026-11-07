@@ -15,6 +15,19 @@
   },
   "dismissOutfit": "Ignora outfit",
   "error": "Generazione suggerimento outfit fallita. Riprova.",
+  "qualityFailure": {
+    "message": "Nessun outfit proposto dall'IA ha superato i controlli: {reason}. Prova con un altro capo scelto o un'altra occasione.",
+    "reasons": {
+      "incompleteOutfit": "mancava una parte sopra o sotto",
+      "missingMandatory": "mancava il capo scelto",
+      "slotConflict": "due capi per la stessa zona del corpo",
+      "footwearCount": "non c'era esattamente un paio di scarpe",
+      "missingDailyAccessory": "mancavano occhiali, cappello o borsa di tutti i giorni",
+      "formalityMismatch": "abiti e scarpe troppo diversi per formalità",
+      "duplicate": "ripetevano suggerimenti recenti",
+      "other": "non rispettavano le regole dell'outfit"
+    }
+  },
   "feedback": {
     "commentsOptional": "Commenti (opzionale)",
     "commentsPlaceholder": "Qualche pensiero su questo outfit?",

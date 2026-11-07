@@ -8,6 +8,10 @@ from app.utils.daily_accessories import daily_accessory
 from app.utils.garment_vocabulary import FORMALITY, ITEM_ROLE
 
 CORE_ROLES = frozenset({"base_top", "bottom", "full_body", "suit"})
+_SLOT_NAMES = {
+    "base_top": "a top (shirt, tee, sweater or similar, or a hoodie worn on its own)",
+    "bottom": "a bottom (pants, jeans, shorts or skirt)",
+}
 
 
 class QualityProblem(str):
@@ -62,9 +66,13 @@ def validate_option(
     if not mandatory <= ids:
         return ids, QualityProblem("missing_mandatory", "missing a mandatory item")
     types = {iid: (items[iid].type or "").lower() for iid in ids}
-    if covered_body_slots(list(ids), types) != BODY_SLOTS:
+    missing = BODY_SLOTS - covered_body_slots(list(ids), types)
+    if missing:
+        # Name the gap: "a top or bottom" made the model resubmit the same look unchanged.
         return ids, QualityProblem(
-            "incomplete_outfit", "missing a top or bottom (or a full-body garment)"
+            "incomplete_outfit",
+            f"missing {' and '.join(_SLOT_NAMES[slot] for slot in sorted(missing))} "
+            "(or a full-body garment)",
         )
     if sum(ITEM_ROLE.get(types[iid]) == "footwear" for iid in ids) != 1:
         return ids, QualityProblem("footwear_count", "must select exactly one footwear item")

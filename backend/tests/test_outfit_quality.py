@@ -25,6 +25,12 @@ def wardrobe(types):
         (["shirt", "pants", "shorts", "sneakers"], [1, 2, 3, 4], False),
         (["shirt", "pants", "sneakers"], [1, 2, 3, 999], False),
         (["shirt", "pants", "sneakers"], [True, 2, 3], False),
+        # A hoodie is the top when worn alone, and a layer over a shirt.
+        (["hoodie", "jeans", "sneakers"], [1, 2, 3], True),
+        (["t-shirt", "hoodie", "jeans", "sneakers"], [1, 2, 3, 4], True),
+        (["hoodie", "sneakers"], [1, 2], False),
+        (["hoodie", "jacket", "jeans", "sneakers"], [1, 2, 3, 4], False),
+        (["jacket", "jeans", "sneakers"], [1, 2, 3], False),
     ],
 )
 def test_complete_outfits_only(types, selection, valid):
@@ -171,6 +177,27 @@ def test_rejections_carry_stable_reason_codes(types, selection, code):
     _, error = validate_option({"items": selection}, numbers, items, set(), [])
     assert error.code == code
     assert isinstance(error, str) and error  # still the instruction sent to the model
+
+
+def test_mandatory_hoodie_can_be_the_only_top():
+    numbers, items = wardrobe(["hoodie", "jeans", "sneakers"])
+    _, error = validate_option({"items": [1, 2, 3]}, numbers, items, {numbers[1]}, [])
+    assert error is None
+
+
+@pytest.mark.parametrize(
+    "types,missing,absent",
+    [
+        (["shirt", "sneakers"], "a bottom", "a top"),
+        (["pants", "sneakers"], "a top", "a bottom"),
+        (["jacket", "pants", "sneakers"], "a top", "a bottom"),
+    ],
+)
+def test_incomplete_outfit_names_the_missing_slot(types, missing, absent):
+    numbers, items = wardrobe(types)
+    _, error = validate_option({"items": list(numbers)}, numbers, items, set(), [])
+    assert error.code == "incomplete_outfit"
+    assert missing in error and absent not in error
 
 
 def test_repeat_code_separates_this_batch_from_recent_history():
