@@ -15,6 +15,19 @@
   },
   "dismissOutfit": "코디 닫기",
   "error": "코디 추천 생성에 실패했어요. 다시 시도해 주세요.",
+  "qualityFailure": {
+    "message": "AI가 만든 코디가 모두 검사를 통과하지 못했어요: {reason}. 지정 아이템이나 상황을 바꿔 다시 시도해 주세요.",
+    "reasons": {
+      "incompleteOutfit": "상의나 하의가 빠졌어요",
+      "missingMandatory": "지정한 아이템이 빠졌어요",
+      "slotConflict": "같은 부위에 두 벌이 골라졌어요",
+      "footwearCount": "신발이 딱 한 켤레가 아니에요",
+      "missingDailyAccessory": "매일 쓰는 안경, 모자 또는 가방이 빠졌어요",
+      "formalityMismatch": "옷과 신발의 격식 차이가 너무 커요",
+      "duplicate": "최근 추천과 겹쳐요",
+      "other": "코디 규칙에 맞지 않아요"
+    }
+  },
   "feedback": {
     "commentsOptional": "코멘트 (선택사항)",
     "commentsPlaceholder": "이 코디에 대한 생각이 있으신가요?",

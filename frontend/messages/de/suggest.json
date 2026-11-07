@@ -15,6 +15,19 @@
   },
   "dismissOutfit": "Outfit verwerfen",
   "error": "Outfit-Vorschlag konnte nicht generiert werden. Bitte versuche es erneut.",
+  "qualityFailure": {
+    "message": "Keines der KI-Outfits hat die Prüfung bestanden: {reason}. Versuche es mit einem anderen gewählten Teil oder Anlass.",
+    "reasons": {
+      "incompleteOutfit": "Ober- oder Unterteil fehlte",
+      "missingMandatory": "das gewählte Teil fehlte",
+      "slotConflict": "zwei Teile für denselben Körperbereich",
+      "footwearCount": "nicht genau ein Paar Schuhe",
+      "missingDailyAccessory": "Brille, Hut oder Tasche für jeden Tag fehlte",
+      "formalityMismatch": "Kleidung und Schuhe passten im Stil nicht zusammen",
+      "duplicate": "Wiederholung früherer Vorschläge",
+      "other": "Outfit-Regeln nicht erfüllt"
+    }
+  },
   "feedback": {
     "commentsOptional": "Kommentare (optional)",
     "commentsPlaceholder": "Gedanken zu diesem Outfit?",

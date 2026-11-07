@@ -92,7 +92,7 @@ the saved looks under `_batch.diagnostics`.
 | `invalid_format` | Items were not a list of integer wardrobe numbers |
 | `unavailable_item` | A number outside the available candidates |
 | `missing_mandatory` | A pinned item was left out |
-| `incomplete_outfit` | No top/bottom or full-body garment |
+| `incomplete_outfit` | No top/bottom or full-body garment (a hoodie worn alone counts as the top) |
 | `footwear_count` | Not exactly one pair of shoes |
 | `slot_conflict` | Two pieces occupy the same body slot |
 | `hot_weather_legwear` | Unrequested legwear in consistently hot weather |
@@ -105,6 +105,20 @@ the saved looks under `_batch.diagnostics`.
 
 An unparsable reply now logs only its length at WARNING level; the full text is
 logged at DEBUG only, because it can echo private event notes.
+
+When no option passes, `/outfits/suggest-options` (503) and the batch fill (422)
+answer `{"code": "no_valid_option" | "fill_no_valid_option", "message", "reason"}`,
+where `reason` is the most frequent code above (ties go to the alphabetically first).
+The suggestion page turns it into a translated sentence naming the failed check.
+
+### Hoodies
+
+A hoodie keeps the `outer_layer` role, so it can go over a shirt or tee without a
+slot conflict, but `fills_top_alone` in `garment_vocabulary.json` also lets it cover
+the top slot when nothing is worn under it. Before this, a pinned hoodie (often a
+short-sleeved one in warm weather) made every look fail as `incomplete_outfit`,
+because the model sensibly wore it as the top. The repair prompt now names the
+missing slot instead of "a top or bottom", so the model does not resubmit the same look.
 
 ## Changes
 

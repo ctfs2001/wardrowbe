@@ -9,6 +9,11 @@ _DATA = json.loads(_VOCABULARY_PATH.read_text())
 ROLES: tuple[str, ...] = tuple(_DATA["roles"])
 TYPES: tuple[str, ...] = tuple(entry["value"] for entry in _DATA["types"])
 ITEM_ROLE: dict[str, str] = {entry["value"]: entry["role"] for entry in _DATA["types"]}
+# Layers that are also a complete top when nothing else is worn under them, such as a hoodie
+# (short-sleeved ones included). Their role stays the layer, so over a shirt they do not clash.
+STANDALONE_TOP_TYPES: frozenset[str] = frozenset(
+    entry["value"] for entry in _DATA["types"] if entry.get("fills_top_alone")
+)
 DEFAULT_WASH_INTERVALS: dict[str, int] = {
     entry["value"]: entry["wash_interval"] for entry in _DATA["types"]
 }
@@ -86,4 +91,4 @@ def render_outfit_prompt(template: str) -> str:
     # ITEM_ROLE so separates, one-piece and legwear lists stay in step with the vocabulary.
     for role in ROLES:
         template = template.replace(f"<<{role.upper()}_TYPES>>", ", ".join(types_for_role(role)))
-    return template
+    return template.replace("<<STANDALONE_TOP_TYPES>>", " or ".join(sorted(STANDALONE_TOP_TYPES)))

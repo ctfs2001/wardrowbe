@@ -334,6 +334,8 @@ async def test_fill_rejects_options_repeating_kept_core_pieces(
     )
     assert response.status_code == 422
     assert response.json()["detail"]["code"] == "fill_no_valid_option"
+    # One of each; the tie goes to the alphabetically first code.
+    assert response.json()["detail"]["reason"] == "duplicate_in_batch"
     assert generate.await_count == 2
     [result] = diagnostics(caplog, "recommendation_result")
     assert result["request_id"] == batch_id and result["kind"] == "fill"
@@ -518,3 +520,50 @@ async def test_single_suggestion_does_not_start_a_batch(
     assert generate.await_count == 1
     stored = await db_session.get(Outfit, UUID(response.json()["id"]))
     assert "_batch" not in stored.ai_raw_response
+
+
+async def add_item(db, user, kind):
+    item = ClothingItem(
+        user_id=user.id,
+        type=kind,
+        image_path=f"test/{uuid4()}.jpg",
+        status=ItemStatus.ready,
+        formality="casual",
+    )
+    db.add(item)
+    await db.commit()
+    return item.id
+
+
+@pytest.mark.asyncio
+async def test_selected_hoodie_can_be_the_only_top(client, auth_headers, db_session, test_user):
+    # A short-sleeved hoodie chosen as the base piece used to fail every look as incomplete.
+    numbers = await wardrobe(db_session, test_user)
+    numbers[10] = await add_item(db_session, test_user, "hoodie")
+    response, generate = await suggest(
+        client,
+        auth_headers,
+        numbers,
+        [reply([[10, 5, 9], [10, 6, 9], [10, 7, 9]])],
+        include_items=[str(numbers[10])],
+    )
+    assert response.status_code == 200, response.text
+    assert len(response.json()) == 3
+    assert all(str(numbers[10]) in {i["id"] for i in look["items"]} for look in response.json())
+    assert generate.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_no_valid_option_says_which_check_failed(client, auth_headers, db_session, test_user):
+    numbers = await wardrobe(db_session, test_user)
+    response, generate = await suggest(
+        client, auth_headers, numbers, [reply([[5, 9], [6, 9]]), reply([[7, 9]])]
+    )
+    assert response.status_code == 503
+    detail = response.json()["detail"]
+    assert detail["code"] == "no_valid_option"
+    assert detail["reason"] == "incomplete_outfit"
+    assert detail["message"]
+    assert NOTES not in response.text
+    assert generate.await_count == 2
+    assert await outfit_count(db_session, test_user) == 0

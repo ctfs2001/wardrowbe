@@ -2,7 +2,7 @@ import logging
 from dataclasses import dataclass
 from uuid import UUID
 
-from app.utils.garment_vocabulary import ITEM_ROLE, ROLES
+from app.utils.garment_vocabulary import ITEM_ROLE, ROLES, STANDALONE_TOP_TYPES
 
 logger = logging.getLogger(__name__)
 
@@ -47,12 +47,17 @@ def _slots_for_type(item_type: str) -> frozenset[str]:
 
 
 def covered_body_slots(item_ids: list[UUID], item_type_map: dict[UUID, str]) -> set[str]:
-    return {
+    covered = {
         slot
         for iid in item_ids
         for slot in _slots_for_type(item_type_map.get(iid, ""))
         if slot in BODY_SLOTS
     }
+    # A hoodie worn on its own is the top. It keeps its outer_layer slot for deduplication,
+    # so it can still go over a shirt, but it no longer leaves a hoodie-and-jeans look bare.
+    if any(item_type_map.get(iid, "") in STANDALONE_TOP_TYPES for iid in item_ids):
+        covered.add("base_top")
+    return covered
 
 
 def deduplicate_by_body_slot(

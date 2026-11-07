@@ -1,6 +1,6 @@
 # Wardrowbe 最新交接入口
 
-更新日期：2026-10-30。此檔是固定入口；下次對話先讀本檔，再讀下列 ai-dev 私有交接。
+更新日期：2026-11-07。此檔是固定入口；下次對話先讀本檔，再讀下列 ai-dev 私有交接。
 
 ## 先讀取什麼
 
@@ -9,6 +9,14 @@
 3. [推薦邏輯與限制](outfit-quality.md)、[本 fork 的修改](../FORK.md)、[貢獻流程](../CONTRIBUTING.md)。
 
 如果私有檔不存在，仍可依本檔理解程式，但正式環境的即時狀態需要重新查證，不能把歷史部署資訊當作目前狀態。
+
+## 2026-11-07 待審核：指定連帽衫時建議全部失敗
+
+- 分支 `ai/hoodie-as-top`（基於 main `055a932`）。起因：建議頁指定一件短袖連帽衫後，AI 每次給的三套和修正後的三套都被判為 `incomplete_outfit`，畫面只顯示英文的「Could not build a complete, distinct outfit…」。
+- 根因：詞彙表把 `hoodie` 歸為 `outer_layer`，完整性檢查只認 `base_top`。AI 把連帽衫直接當上衣（天氣暖時合理），檢查卻認定缺上衣；修正提示只說「missing a top or bottom」，AI 又交回同樣的組合。
+- 修正：`garment_vocabulary.json` 的 hoodie 加 `fills_top_alone`，單獨穿時算上衣；角色仍是外層，套在 T 恤外不會衝突，與夾克同選仍判衝突。推薦提示詞說明連帽衫可單穿；修正提示改為指出缺的是上衣或下身。
+- `/outfits/suggest-options` 全部未通過時仍回 503，但 detail 改為 `{code: "no_valid_option", message, reason}`；補生的 422 也帶 `reason`。建議頁依 reason 顯示翻譯後的原因（八種語言）。`/outfits/suggest` 不變。
+- 不需 migration、新 provider 或機密；不改既有資料。
 
 ## 2026-10-30 CI 沒有建立執行紀錄時的手動重跑
 

@@ -15,6 +15,19 @@
   },
   "dismissOutfit": "Ignorer la tenue",
   "error": "Échec de la génération de la suggestion de tenue. Veuillez réessayer.",
+  "qualityFailure": {
+    "message": "Aucune tenue proposée par l'IA n'a passé les vérifications : {reason}. Essayez une autre pièce choisie ou une autre occasion.",
+    "reasons": {
+      "incompleteOutfit": "il manquait un haut ou un bas",
+      "missingMandatory": "la pièce choisie était absente",
+      "slotConflict": "deux pièces occupaient la même zone du corps",
+      "footwearCount": "il n'y avait pas exactement une paire de chaussures",
+      "missingDailyAccessory": "les lunettes, le chapeau ou le sac du quotidien manquaient",
+      "formalityMismatch": "les vêtements et les chaussures étaient trop éloignés en formalité",
+      "duplicate": "elles reprenaient des suggestions récentes",
+      "other": "elles ne respectaient pas les règles de tenue"
+    }
+  },
   "feedback": {
     "commentsOptional": "Commentaires (optionnel)",
     "commentsPlaceholder": "Des remarques sur cette tenue ?",

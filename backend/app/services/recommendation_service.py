@@ -2,6 +2,7 @@ import hashlib
 import json
 import logging
 import re
+from collections import Counter
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, fields
@@ -1203,9 +1204,13 @@ class RecommendationService:
                 task_name="recommendation_fill" if fill_batch else "recommendation",
             )
             if not approved:
+                rejected: Counter[str] = Counter()
+                for record in diagnostics.attempts:
+                    rejected.update(record.rejected)
                 raise NoValidOptionError(
                     "Could not build a complete, distinct outfit from the available items. "
-                    "Try changing selected items or the occasion."
+                    "Try changing selected items or the occasion.",
+                    reason=max(sorted(rejected), key=rejected.__getitem__, default=None),
                 )
 
             batch_meta = None
@@ -1523,7 +1528,14 @@ class AIRecommendationError(Exception):
 
 
 class NoValidOptionError(AIRecommendationError):
-    """The AI answered, but no option passed the quality checks."""
+    """The AI answered, but no option passed the quality checks.
+
+    ``reason`` is the most frequent rejection code, so the page can say which check failed.
+    """
+
+    def __init__(self, message: str, reason: str | None = None):
+        super().__init__(message)
+        self.reason = reason
 
 
 class SuggestionBatchError(Exception):
