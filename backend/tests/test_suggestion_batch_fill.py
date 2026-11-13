@@ -22,6 +22,8 @@ from app.services.recommendation_service import (
     MAX_FILL_ATTEMPTS,
     RecommendationService,
     SuggestionBatchBusyError,
+    SuggestionBatchGeneratingError,
+    _weather_from_dict,
     _with_option_count,
 )
 from app.utils.timezone import get_user_today
@@ -567,3 +569,123 @@ async def test_no_valid_option_says_which_check_failed(client, auth_headers, db_
     assert NOTES not in response.text
     assert generate.await_count == 2
     assert await outfit_count(db_session, test_user) == 0
+
+
+@pytest.mark.asyncio
+async def test_resending_a_client_request_id_returns_the_saved_options_without_ai(
+    client, auth_headers, db_session, test_user
+):
+    # The phone lost the first response; the page resends the same id to recover it.
+    numbers = await wardrobe(db_session, test_user)
+    request_id = str(uuid4())
+    first, _ = await suggest(
+        client,
+        auth_headers,
+        numbers,
+        [reply([[1, 5, 9], [2, 6, 9], [3, 7, 9]])],
+        client_request_id=request_id,
+    )
+    assert first.status_code == 200, first.text
+    assert {o["suggestion_batch"]["id"] for o in first.json()} == {request_id}
+
+    again, generate = await suggest(
+        client,
+        auth_headers,
+        numbers,
+        [reply([[4, 8, 9], [1, 6, 9], [2, 7, 9]])],
+        client_request_id=request_id,
+    )
+    assert again.status_code == 200, again.text
+    assert [o["id"] for o in again.json()] == [o["id"] for o in first.json()]
+    assert again.json()[0]["suggestion_batch"]["saved_count"] == 3
+    generate.assert_not_awaited()
+    assert await outfit_count(db_session, test_user) == 3
+
+
+@pytest.mark.asyncio
+async def test_resend_while_the_first_request_runs_is_refused_without_ai(
+    client, auth_headers, db_session, test_user
+):
+    numbers = await wardrobe(db_session, test_user)
+    request_id = uuid4()
+
+    async with RecommendationService(db_session)._fill_lock(request_id) as acquired:
+        assert acquired
+        busy, generate = await suggest(
+            client,
+            auth_headers,
+            numbers,
+            [reply([[1, 5, 9], [2, 6, 9], [3, 7, 9]])],
+            client_request_id=str(request_id),
+        )
+    assert busy.status_code == 409
+    assert busy.json()["detail"]["code"] == "suggest_in_progress"
+    generate.assert_not_awaited()
+    assert await outfit_count(db_session, test_user) == 0
+
+
+@pytest.mark.asyncio
+async def test_concurrent_resends_generate_the_batch_once(db_session, test_user, session_maker):
+    numbers = await wardrobe(db_session, test_user)
+    request_id = uuid4()
+
+    async def slow_reply(*args, **kwargs):
+        await asyncio.sleep(0.3)
+        return reply([[1, 5, 9], [2, 6, 9], [3, 7, 9]])
+
+    async def run():
+        async with session_maker() as session:
+            user = await session.scalar(
+                select(User).where(User.id == test_user.id).options(selectinload(User.preferences))
+            )
+            try:
+                saved = await RecommendationService(session).generate_batch_once(
+                    user,
+                    request_id,
+                    occasion="casual",
+                    weather_override=_weather_from_dict(
+                        {
+                            "temperature": 19,
+                            "feels_like": 19,
+                            "humidity": 50,
+                            "precipitation_chance": 30,
+                            "precipitation_mm": 0,
+                            "wind_speed": 0,
+                            "condition": "cloudy",
+                            "condition_code": 0,
+                            "is_day": True,
+                            "uv_index": 0,
+                            "timestamp": "2026-11-13T00:00:00",
+                        }
+                    ),
+                    count=3,
+                )
+                return len(saved)
+            except SuggestionBatchGeneratingError:
+                return "busy"
+
+    with (
+        patch.object(RecommendationService, "_format_items_for_prompt", return_value=("", numbers)),
+        patch(AI, AsyncMock(side_effect=slow_reply)) as generate,
+    ):
+        results = await asyncio.gather(run(), run())
+
+    assert sorted(results, key=str) == [3, "busy"]
+    assert generate.await_count == 1
+    assert await outfit_count(db_session, test_user) == 3
+
+
+@pytest.mark.asyncio
+async def test_without_a_client_request_id_each_request_is_a_new_batch(
+    client, auth_headers, db_session, test_user
+):
+    # Older clients keep today's behaviour: every press generates new options.
+    numbers = await wardrobe(db_session, test_user)
+    looks = [reply([[1, 5, 9], [2, 6, 9], [3, 7, 9]])]
+    first, _ = await suggest(client, auth_headers, numbers, looks)
+    second, generate = await suggest(
+        client, auth_headers, numbers, [reply([[4, 8, 9], [1, 6, 9], [2, 7, 9]])]
+    )
+    assert first.status_code == second.status_code == 200
+    assert first.json()[0]["suggestion_batch"]["id"] != second.json()[0]["suggestion_batch"]["id"]
+    generate.assert_awaited()

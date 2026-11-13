@@ -861,13 +861,15 @@ class RecommendationService:
         event_notes: str | None = None,
         activity_needs: list[ActivityNeed] | None = None,
         fill_batch: SuggestionBatch | None = None,
+        batch_id: UUID | None = None,
     ) -> list[Outfit]:
         """Generate, validate and save outfit options.
 
         A multi-option request becomes a suggestion batch: its saved options carry the
         request snapshot so a later fill can generate only the missing options. With
         ``fill_batch`` this generates ``count`` options for that batch, keeping its
-        existing options and comparing new core pieces against them.
+        existing options and comparing new core pieces against them. ``batch_id`` names a
+        new batch (the client's request id) instead of a random one.
         """
         # Guard first so deferral is unconditional, before any location/weather work.
         require_internal_ai("text")
@@ -888,7 +890,7 @@ class RecommendationService:
             not exclude_items and not single_outfit and not event_notes and fill_batch is None
         )
         starts_batch = fill_batch is None and not single_outfit and count > 1
-        request_id = fill_batch.id if fill_batch else uuid4()
+        request_id = fill_batch.id if fill_batch else (batch_id or uuid4())
 
         # Rejecting a combination does not blacklist its individual garments.
 
@@ -1471,6 +1473,23 @@ class RecommendationService:
             return True
         return int(used) <= MAX_FILL_ATTEMPTS
 
+    async def generate_batch_once(self, user: User, batch_id: UUID, **kwargs) -> list[Outfit]:
+        """Generate a multi-option batch under a client-chosen id, at most once.
+
+        A client that lost the response (phone switched networks, tab backgrounded) sends
+        the same id again: a saved batch is returned without calling the AI, and while the
+        first request is still generating the retry gets SuggestionBatchGeneratingError. Shares
+        the fill lock, so a fill cannot overlap the batch's own generation either.
+        """
+        async with self._fill_lock(batch_id) as acquired:
+            if not acquired:
+                raise SuggestionBatchGeneratingError("These outfits are still being generated.")
+            existing = await self.get_suggestion_batch(user, batch_id)
+            if existing is not None:
+                logger.info("Suggestion batch already saved request_id=%s", batch_id)
+                return existing.outfits
+            return await self.generate_recommendations(user=user, batch_id=batch_id, **kwargs)
+
     async def fill_suggestion_batch(
         self, user: User, batch_id: UUID
     ) -> tuple[SuggestionBatch, list[Outfit]]:
@@ -1548,6 +1567,10 @@ class SuggestionBatchNotFoundError(SuggestionBatchError):
 
 class SuggestionBatchBusyError(SuggestionBatchError):
     code = "fill_in_progress"
+
+
+class SuggestionBatchGeneratingError(SuggestionBatchBusyError):
+    code = "suggest_in_progress"
 
 
 class SuggestionBatchExpiredError(SuggestionBatchError):

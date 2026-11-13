@@ -54,6 +54,7 @@
     "yesWoreIt": "是的，我穿了"
   },
   "generating": "正在為你打造穿搭...",
+  "reconnecting": "連線中斷，正在取回你的穿搭...",
   "getSuggestion": "取得建議",
   "greeting": {
     "afternoon": "午安",

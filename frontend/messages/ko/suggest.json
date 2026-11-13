@@ -54,6 +54,7 @@
     "yesWoreIt": "네, 입었어요"
   },
   "generating": "코디를 만들고 있어요...",
+  "reconnecting": "연결이 끊겼어요. 코디를 다시 불러오는 중...",
   "getSuggestion": "추천 받기",
   "greeting": {
     "afternoon": "좋은 오후예요",

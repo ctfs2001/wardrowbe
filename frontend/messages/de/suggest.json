@@ -54,6 +54,7 @@
     "yesWoreIt": "Ja, ich habe es getragen"
   },
   "generating": "Dein Look wird erstellt...",
+  "reconnecting": "Verbindung unterbrochen, deine Looks werden abgerufen...",
   "getSuggestion": "Vorschlag erhalten",
   "greeting": {
     "afternoon": "Guten Nachmittag",
