@@ -60,7 +60,7 @@ describe('outfit planning', () => {
     fireEvent.click(screen.getByRole('button', { name: 'getSuggestion' }))
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/outfits/suggest-options', {
       occasion: 'casual', include_items: [], wear_day: 'tomorrow', time_of_day: 'morning',
-      activity_needs: ['walking'], event_notes: 'Meet friends',
+      activity_needs: ['walking'], event_notes: 'Meet friends', client_request_id: expect.any(String),
     }))
     expect(useWeather).toHaveBeenCalledWith('tomorrow', 'morning')
   })

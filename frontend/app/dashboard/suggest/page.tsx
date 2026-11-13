@@ -55,6 +55,7 @@ import { OccasionChips } from '@/components/shared/occasion-chips';
 import { useOccasionLabel, useWeatherConditionLabel, useTypeLabel } from '@/lib/hooks/use-translated-constants';
 import { useItem } from '@/lib/hooks/use-items';
 import { api, ApiError } from '@/lib/api';
+import { newRequestId } from '@/lib/request-id';
 import { applySessionToken } from '@/lib/hooks/use-session-token';
 import { ActivityNeed, WearDay, WearPeriod, ClothingTypeValue, CurrentWeather, Item, Outfit, SuggestRequest, SuggestionBatchInfo, SuggestionBatchResponse } from '@/lib/types';
 import { useWeather } from '@/lib/hooks/use-weather';
@@ -670,6 +671,31 @@ async function discardAlternatives(outfits: Outfit[], keepId?: string) {
   );
 }
 
+// Generating takes 10-20 s, long enough for a phone to switch networks or suspend the tab
+// and drop the response while the server finishes and saves the looks. Resend the same
+// request id until the saved looks come back, instead of failing and generating again.
+const RECOVER_WINDOW_MS = 120_000;
+const RECOVER_DELAY_MS = 3_000;
+
+const isStillGenerating = (err: unknown) =>
+  err instanceof ApiError &&
+  err.status === 409 &&
+  (err.data as { detail?: { code?: string } } | undefined)?.detail?.code === 'suggest_in_progress';
+
+async function requestOptions(request: SuggestRequest, onRecovering: () => void): Promise<Outfit[]> {
+  const deadline = Date.now() + RECOVER_WINDOW_MS;
+  for (;;) {
+    try {
+      return await api.post<Outfit[]>('/outfits/suggest-options', request);
+    } catch (err) {
+      const lost = !(err instanceof ApiError);
+      if (!(lost || isStillGenerating(err)) || Date.now() + RECOVER_DELAY_MS > deadline) throw err;
+      onRecovering();
+      await new Promise((resolve) => setTimeout(resolve, RECOVER_DELAY_MS));
+    }
+  }
+}
+
 const BASE_ITEM_FILTER_TYPES = [
   'shirt', 't-shirt', 'pants', 'jeans', 'shoes', 'sneakers', 'jacket', 'dress',
 ] as const satisfies readonly ClothingTypeValue[];
@@ -697,6 +723,7 @@ function SuggestContent() {
   const [isItemPickerOpen, setIsItemPickerOpen] = useState(false);
   const [filterType, setFilterType] = useState<string | undefined>(undefined);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isRecovering, setIsRecovering] = useState(false);
   const [outfits, setOutfits] = useState<Outfit[]>([]);
   const [activeOptionIndex, setActiveOptionIndex] = useState<number>(0);
   const [isCompareAll, setIsCompareAll] = useState(false);
@@ -737,6 +764,7 @@ function SuggestContent() {
         time_of_day: wearPeriod,
         activity_needs: activityNeeds,
         include_items: selectedItem ? [selectedItem.id] : [],
+        client_request_id: newRequestId(),
       };
 
       if (weatherOverride) {
@@ -754,7 +782,7 @@ function SuggestContent() {
         request.event_notes = notes;
       }
 
-      const result = await api.post<Outfit[]>('/outfits/suggest-options', request);
+      const result = await requestOptions(request, () => setIsRecovering(true));
       setOutfits(result);
       setActiveOptionIndex(0);
       resetBatch(result[0]?.suggestion_batch ?? null);
@@ -767,6 +795,7 @@ function SuggestContent() {
       console.error('Suggestion error:', err);
     } finally {
       setIsGenerating(false);
+      setIsRecovering(false);
     }
   };
 
@@ -1052,7 +1081,7 @@ function SuggestContent() {
                   {isGenerating ? (
                     <>
                       <Loader2 className="h-5 w-5 animate-spin" />
-                      {t('generating')}
+                      {isRecovering ? t('reconnecting') : t('generating')}
                     </>
                   ) : (
                     <>

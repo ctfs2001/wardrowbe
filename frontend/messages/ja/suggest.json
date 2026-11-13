@@ -54,6 +54,7 @@
     "yesWoreIt": "はい、着ました"
   },
   "generating": "コーデを作成中...",
+  "reconnecting": "接続が切れました。コーデを取り戻しています...",
   "getSuggestion": "提案を取得",
   "greeting": {
     "afternoon": "こんにちは",

@@ -415,6 +415,8 @@ export interface SuggestRequest {
   exclude_items?: string[];
   include_items?: string[];
   event_notes?: string;
+  // One per button press; resending it after a lost response returns the saved options.
+  client_request_id?: string;
 }
 
 // Pairing types

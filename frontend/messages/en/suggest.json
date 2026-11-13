@@ -54,6 +54,7 @@
     "yesWoreIt": "Yes, I wore it"
   },
   "generating": "Creating your look...",
+  "reconnecting": "Connection dropped, getting your looks back...",
   "getSuggestion": "Get Suggestion",
   "greeting": {
     "afternoon": "Good afternoon",

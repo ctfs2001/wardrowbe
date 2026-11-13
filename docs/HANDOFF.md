@@ -1,6 +1,6 @@
 # Wardrowbe 最新交接入口
 
-更新日期：2026-11-07。此檔是固定入口；下次對話先讀本檔，再讀下列 ai-dev 私有交接。
+更新日期：2026-11-13。此檔是固定入口；下次對話先讀本檔，再讀下列 ai-dev 私有交接。
 
 ## 先讀取什麼
 
@@ -9,6 +9,15 @@
 3. [推薦邏輯與限制](outfit-quality.md)、[本 fork 的修改](../FORK.md)、[貢獻流程](../CONTRIBUTING.md)。
 
 如果私有檔不存在，仍可依本檔理解程式，但正式環境的即時狀態需要重新查證，不能把歷史部署資訊當作目前狀態。
+
+## 2026-11-13 待審核：連線中斷後取回已產生的穿搭
+
+- 分支 `ai/suggest-recover-after-disconnect`（基於 main `4e0ebeb`）。起因：手機產生建議要等 10～20 秒，期間切換 Wi-Fi／行動網路或切到背景時，瀏覽器收不到回應，頁面顯示「產生穿搭建議失敗，請重試。」；但後端其實已經完成並存好三套。使用者重按又多存一批，失敗的那批則默默留在待處理穿搭。
+- `/outfits/suggest-options` 新增可選 `client_request_id`（UUID），建議頁每按一次產生一個新的。後端用它當批次 id：同一 id 再送時，已存好就直接回傳原批次（不呼叫 AI、不計入 rate limit）；第一個請求仍在產生中就回 409 `suggest_in_progress`。生成本身與補生共用同一把 advisory lock，兩個同 id 請求同時到也只會產生一次。
+- 建議頁遇到連線錯誤或 409 `suggest_in_progress` 時，每 3 秒用同一 id 重送，最多 2 分鐘，期間按鈕顯示「連線中斷，正在取回你的穿搭...」（八種語言）；其他伺服器錯誤照舊立即顯示。逾時仍失敗才顯示原本的錯誤。
+- request id 在 http 內網位址也能產生（`crypto.randomUUID` 需要安全連線，沒有時改用 `getRandomValues`）。
+- 不帶 `client_request_id` 的舊客戶端行為不變。不需 migration、新 provider 或機密。
+- 本地驗證（NAS 上拋棄式容器，隔離 PostgreSQL／Redis）：後端完整套件 2154 passed、27 skipped，ruff check／format 通過；前端 vitest 70／72 檔通過，失敗的 `i18n-scan`、`subtype-prompt-parity` 在未修改的 main 同環境也一樣失敗；tsc、lint、i18n:check 通過。完整結果以 PR CI 為準。
 
 ## 2026-11-07 待審核：指定連帽衫時建議全部失敗
 

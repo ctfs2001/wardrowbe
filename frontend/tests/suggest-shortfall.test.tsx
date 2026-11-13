@@ -187,4 +187,53 @@ describe('suggestion shortfall', () => {
     expect(api.get).toHaveBeenCalledWith('/outfits/suggestion-batches/batch-1')
     expect(vi.mocked(api.post).mock.calls.filter(([url]) => url === FILL_URL)).toHaveLength(1)
   })
+
+  it('gets the saved looks back after the connection drops instead of failing', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const options = [look('one', 3), look('two', 3), look('three', 3)]
+    vi.mocked(api.post)
+      .mockRejectedValueOnce(new Error('Unable to connect to server. Please try again.'))
+      .mockRejectedValueOnce(
+        new ApiError('busy', 409, { detail: { code: 'suggest_in_progress', message: 'busy' } }),
+      )
+      .mockResolvedValueOnce(options)
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: 'getSuggestion' }))
+    expect(await screen.findByText('reconnecting')).toBeInTheDocument()
+    await act(async () => { await vi.advanceTimersByTimeAsync(6500) })
+
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /options.optionNumber/ })).toHaveLength(3))
+    expect(screen.queryByText('error')).not.toBeInTheDocument()
+    const ids = vi.mocked(api.post).mock.calls
+      .filter(([url]) => url === '/outfits/suggest-options')
+      .map(([, body]) => (body as { client_request_id?: string }).client_request_id)
+    expect(ids).toHaveLength(3)
+    expect(ids[0]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+    expect(new Set(ids).size).toBe(1)
+  })
+
+  it('gives up and says so when the server stays unreachable', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.mocked(api.post).mockRejectedValue(new Error('Unable to connect to server. Please try again.'))
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: 'getSuggestion' }))
+    await act(async () => { await vi.advanceTimersByTimeAsync(125_000) })
+
+    expect(await screen.findByText('error')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'getSuggestion' })).toBeEnabled()
+  })
+
+  it('uses a new request id for each press', async () => {
+    await generate([look('one', 3), look('two', 3), look('three', 3)])
+    fireEvent.click(screen.getByRole('button', { name: /startOver/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'casual' }))
+    fireEvent.click(screen.getByRole('button', { name: 'getSuggestion' }))
+    await waitFor(() =>
+      expect(vi.mocked(api.post).mock.calls.filter(([url]) => url === '/outfits/suggest-options')).toHaveLength(2),
+    )
+    const ids = vi.mocked(api.post).mock.calls
+      .filter(([url]) => url === '/outfits/suggest-options')
+      .map(([, body]) => (body as { client_request_id?: string }).client_request_id)
+    expect(ids[0]).not.toBe(ids[1])
+  })
 })

@@ -54,6 +54,7 @@
     "yesWoreIt": "Sì, l'ho indossato"
   },
   "generating": "Creazione del tuo look...",
+  "reconnecting": "Connessione interrotta, recupero dei tuoi look...",
   "getSuggestion": "Ottieni suggerimento",
   "greeting": {
     "afternoon": "Buon pomeriggio",
